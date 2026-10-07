@@ -503,7 +503,7 @@
         icon: '<div class="w-full h-full flex flex-col gap-0.5"><div class="h-1/2 flex gap-0.5"><div class="flex-1 bg-slate-600 rounded-sm"></div><div class="flex-1 bg-slate-600 rounded-sm"></div></div><div class="h-1/2 bg-slate-600 rounded-sm"></div></div>',
         cells: [
           { x: 0, y: 0, w: 0.5, h: 0.46 },
-          { x: 0.5, y: 0.5, w: 0.5, h: 0.46 },
+          { x: 0.5, y: 0, w: 0.5, h: 0.46 },
           { x: 0, y: 0.46, w: 1, h: 0.54 }
         ]
       }
@@ -912,36 +912,52 @@
       const schedule = [];
       if (state.scenes.length === 0) return schedule;
 
-      let currentGlobalStart = 0;
       const count = state.scenes.length;
+      const exitTransitions = new Array(count).fill(0);
 
       for (let i = 0; i < count; i++) {
         const sc = state.scenes[i];
         const hasNext = (i < count - 1) || (state.seamlessLoopMode && count > 1);
-        let transDur = 0;
-
         if (hasNext && sc.transition && sc.transition !== 'cut') {
           const requestedTrans = sc.transitionDuration !== undefined ? sc.transitionDuration : 0.7;
           const nextSc = (i < count - 1) ? state.scenes[i + 1] : state.scenes[0];
-          transDur = Math.min(requestedTrans, sc.duration * 0.8, nextSc.duration * 0.8);
+          exitTransitions[i] = Math.min(requestedTrans, sc.duration * 0.4, nextSc.duration * 0.4);
+        }
+      }
+
+      let currentGlobalStart = 0;
+      for (let i = 0; i < count; i++) {
+        const sc = state.scenes[i];
+        const transDur = exitTransitions[i];
+
+        let entryTransDur = 0;
+        if (i > 0) {
+          entryTransDur = exitTransitions[i - 1];
+        } else if (state.seamlessLoopMode && count > 1) {
+          entryTransDur = exitTransitions[count - 1];
         }
 
-        const nextSceneObj = (i < count - 1) ? state.scenes[i + 1] : (state.seamlessLoopMode ? state.scenes[0] : null);
+        const soloDuration = Math.max(0.05, sc.duration - entryTransDur - transDur);
+        const transStartTime = currentGlobalStart + soloDuration;
+        const globalEndTime = transStartTime + transDur;
+
+        const nextSceneObj = (i < count - 1) ? state.scenes[i + 1] : (state.seamlessLoopMode && count > 1 ? state.scenes[0] : null);
         const nextSceneIdx = (i < count - 1) ? (i + 1) : 0;
 
         schedule.push({
           sceneIndex: i,
           scene: sc,
           globalStartTime: currentGlobalStart,
-          duration: sc.duration,
-          globalEndTime: currentGlobalStart + sc.duration,
+          soloDuration: soloDuration,
+          transStartTime: transStartTime,
+          globalEndTime: globalEndTime,
+          entryTransDuration: entryTransDur,
           transDuration: transDur,
-          transStartTime: currentGlobalStart + sc.duration - transDur,
           nextScene: nextSceneObj,
           nextSceneIndex: nextSceneIdx
         });
 
-        currentGlobalStart += (sc.duration - transDur);
+        currentGlobalStart = globalEndTime;
       }
 
       return schedule;
@@ -951,14 +967,8 @@
       if (state.scenes.length === 0) return 0;
       const schedule = buildTimelineSchedule();
       if (schedule.length === 0) return 0;
-
-      if (state.seamlessLoopMode && state.scenes.length > 1) {
-        const lastItem = schedule[schedule.length - 1];
-        return Math.max(0.1, lastItem.transStartTime + lastItem.transDuration - schedule[0].globalStartTime);
-      } else {
-        const lastEntry = schedule[schedule.length - 1];
-        return Math.max(0.1, lastEntry.globalEndTime);
-      }
+      const lastEntry = schedule[schedule.length - 1];
+      return Math.max(0.1, lastEntry.globalEndTime);
     }
 
     function getTimelineStateAtTime(globalT) {
@@ -979,20 +989,14 @@
         const item = schedule[i];
         const hasTransition = item.transDuration > 0 && item.nextScene !== null;
 
-        if (hasTransition && normT >= item.transStartTime && normT < item.transStartTime + item.transDuration) {
+        if (hasTransition && normT >= item.transStartTime && normT < item.globalEndTime) {
           const transProgress = (normT - item.transStartTime) / item.transDuration;
 
-          const localTimeA = normT - item.globalStartTime;
-          const progA = Math.min(Math.max(0, localTimeA / item.duration), 1.0);
+          const localTimeA = item.entryTransDuration + item.soloDuration + (normT - item.transStartTime);
+          const progA = Math.min(Math.max(0, localTimeA / item.scene.duration), 1.0);
 
-          let progB = 0;
-          if (item.nextSceneIndex === 0 && i === schedule.length - 1) {
-            progB = Math.min(Math.max(0, (normT - item.transStartTime) / item.nextScene.duration), 1.0);
-          } else {
-            const nextItem = schedule[item.nextSceneIndex];
-            const localTimeB = normT - nextItem.globalStartTime;
-            progB = Math.min(Math.max(0, localTimeB / nextItem.duration), 1.0);
-          }
+          const localTimeB = normT - item.transStartTime;
+          const progB = Math.min(Math.max(0, localTimeB / item.nextScene.duration), 1.0);
 
           return {
             isTransition: true,
@@ -1007,9 +1011,9 @@
           };
         }
 
-        if (normT >= item.globalStartTime && (normT < item.transStartTime || !hasTransition)) {
-          const localTime = normT - item.globalStartTime;
-          const prog = Math.min(Math.max(0, localTime / item.duration), 1.0);
+        if (normT >= item.globalStartTime && normT < item.transStartTime) {
+          const localTime = item.entryTransDuration + (normT - item.globalStartTime);
+          const prog = Math.min(Math.max(0, localTime / item.scene.duration), 1.0);
           return {
             isTransition: false,
             scene: item.scene,
@@ -1021,11 +1025,12 @@
       }
 
       const lastItem = schedule[schedule.length - 1];
+      const localTime = lastItem.entryTransDuration + lastItem.soloDuration;
       return {
         isTransition: false,
         scene: lastItem.scene,
         index: lastItem.sceneIndex,
-        prog: 1.0,
+        prog: Math.min(Math.max(0, localTime / lastItem.scene.duration), 1.0),
         activeSceneIndex: lastItem.sceneIndex
       };
     }
@@ -1058,6 +1063,7 @@
     }
 
     function drawSingleCell(tCtx, rx, ry, rw, rh, gap, config, rawProg) {
+      if (!config) config = createDefaultCellConfig();
       const x = rx + gap;
       const y = ry + gap;
       const w = Math.max(2, rw - gap * 2);
@@ -1417,7 +1423,11 @@
         if (tState.activeSceneIndex !== state.currentSceneIndex) {
           state.currentSceneIndex = tState.activeSceneIndex;
           renderScenesTabs();
-          updateSceneInspectorUI();
+          const activeEl = document.activeElement;
+          const isUserEditing = activeEl && cellsInspectorList.contains(activeEl);
+          if (!isUserEditing) {
+            updateSceneInspectorUI();
+          }
         }
         currentSceneBadge.textContent = `씬 ${tState.activeSceneIndex + 1} / ${state.scenes.length}`;
       }
