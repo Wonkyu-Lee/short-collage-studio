@@ -1,0 +1,2847 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shorts Collage Studio Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Standalone HEIC Decoder Fallback -->
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+
+  <!-- mp4-muxer for high-speed client-side MP4 generation with synchronized H.264 & AAC audio via WebCodecs -->
+  <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.4/build/mp4-muxer.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap');
+    * { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #07090f; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    input[type=range] { accent-color: #6366f1; }
+  </style>
+</head>
+<body class="bg-[#05070d] text-slate-100 flex flex-col h-screen overflow-hidden select-none antialiased">
+
+  <header class="h-14 border-b border-slate-800/80 bg-slate-900/95 backdrop-blur-md px-5 flex items-center justify-between shrink-0 z-30">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+        <i class="fa-solid fa-film text-white text-sm"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+            쇼츠 콜라주 스튜디오 <span class="bg-gradient-to-r from-amber-400 via-rose-400 to-indigo-400 bg-clip-text text-transparent font-black text-xs uppercase tracking-wider">PRO</span>
+          </h1>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            H.264 + AAC MP4 지원
+          </span>
+        </div>
+        <p class="text-[10px] text-slate-400 leading-none mt-0.5">Ultra-Smooth 9:16 Shorts (1080×1920) • BGM 싱크 & 무한 루프</p>
+      </div>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="flex items-center space-x-2">
+      <!-- Seamless Loop Toggle Button -->
+      <button id="toggleLoopModeBtn" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800/90 hover:bg-slate-700 text-indigo-300 border border-slate-700 hover:border-indigo-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95" title="마지막 씬과 첫 씬을 자연스럽게 연결하는 무한 루프 모드 토글">
+        <i class="fa-solid fa-infinity text-indigo-400 text-xs"></i>
+        <span>루프 모드: <span id="loopModeStatusLabel" class="text-emerald-400 font-bold">ON</span></span>
+      </button>
+
+      <label class="cursor-pointer px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800/90 hover:bg-slate-700 text-indigo-300 border border-slate-700 hover:border-indigo-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95" title="저장된 프로젝트 파일(.json) 불러오기">
+        <i class="fa-solid fa-folder-open text-indigo-400 text-[11px]"></i>
+        <span>불러오기</span>
+        <input type="file" id="importProjectInput" accept=".json" class="hidden">
+      </label>
+
+      <button id="exportProjectBtn" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800/90 hover:bg-slate-700 text-indigo-300 border border-slate-700 hover:border-indigo-500/40 transition flex items-center gap-1.5 shadow-sm active:scale-95" title="현재 프로젝트(사진, BGM, 씬 전체) 파일로 저장">
+        <i class="fa-solid fa-download text-indigo-400 text-[11px]"></i>
+        <span>프로젝트 저장</span>
+      </button>
+
+      <div class="h-4 w-[1px] bg-slate-800 mx-1"></div>
+
+      <!-- Video Export Format Selection Dropdown -->
+      <div class="flex items-center bg-slate-800/90 border border-slate-700 rounded-lg p-0.5">
+        <button id="formatMp4Btn" class="px-2 py-1 text-[11px] font-bold rounded-md bg-indigo-600 text-white transition shadow-sm">MP4 (AAC)</button>
+        <button id="formatWebmBtn" class="px-2 py-1 text-[11px] font-semibold rounded-md text-slate-400 hover:text-white transition">WebM</button>
+      </div>
+
+      <button id="resetStorageBtn" class="px-2 py-1.5 text-xs font-medium rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-800 hover:border-rose-500/30 transition flex items-center gap-1" title="프로젝트 및 사진 전체 초기화">
+        <i class="fa-solid fa-arrow-rotate-left text-[11px]"></i>
+      </button>
+      <button id="addSceneBtn" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+        <i class="fa-solid fa-plus text-indigo-400 text-[11px]"></i> 씬 추가
+      </button>
+      <button id="exportVideoBtn" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-2 shadow-lg shadow-indigo-600/30 active:scale-95">
+        <i class="fa-solid fa-file-video text-xs"></i>
+        <span id="exportBtnLabel">MP4 쇼츠 렌더링</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT PANEL: Multi-asset Pool & BGM -->
+    <aside class="w-80 border-r border-slate-800/80 bg-slate-900/50 flex flex-col shrink-0">
+      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fa-regular fa-images text-indigo-400 text-sm"></i>
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-300">사진 보관함</span>
+          <span id="assetCountBadge" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-indigo-300 border border-slate-700 font-mono">0</span>
+        </div>
+        
+        <button id="triggerUploadBtn" type="button" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-medium transition flex items-center gap-1 shadow-sm active:scale-95">
+          <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i> 사진 올리기
+        </button>
+        <input type="file" id="multiImageInput" multiple accept="image/*, .heic, .heif, .HEIC, .HEIF" class="hidden">
+      </div>
+
+      <!-- Drag & Drop Zone -->
+      <div id="dropZone" class="m-3 p-3.5 rounded-xl border-2 border-dashed border-slate-800 hover:border-indigo-500/60 bg-slate-900/40 text-center transition flex flex-col items-center justify-center cursor-pointer group">
+        <div class="w-10 h-10 rounded-full bg-indigo-500/10 group-hover:bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-1.5 transition">
+          <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+        </div>
+        <p class="text-[11px] text-slate-300 font-medium">사진들을 드래그하거나 클릭하여 추가</p>
+        <p class="text-[9px] text-emerald-400 font-semibold mt-0.5">JPG, PNG, WebP & 아이폰 HEIC 자동 변환</p>
+        <p class="text-[9px] text-slate-500 mt-0.5">새로고침 시 IndexedDB 100% 영구 보존</p>
+      </div>
+
+      <!-- Gallery List -->
+      <div class="px-3 pb-1 flex items-center justify-between text-[11px] text-slate-400">
+        <span>등록된 사진 리스트</span>
+        <button id="quickDistributeBtn" class="text-indigo-400 hover:text-indigo-300 text-[10px] font-semibold flex items-center gap-1 hover:underline">
+          <i class="fa-solid fa-shuffle text-[9px]"></i> 전체 씬 균등 분배
+        </button>
+      </div>
+      <div id="galleryContainer" class="flex-1 px-3 pb-3 overflow-y-auto space-y-2"></div>
+
+      <!-- Audio (BGM) Panel with AudioBuffer Sync Support -->
+      <div class="p-3.5 border-t border-slate-800 bg-slate-900/80 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-music text-purple-400"></i> 배경음악 (BGM 사운드)
+          </span>
+          <div class="flex items-center gap-2">
+            <button id="removeBgmBtn" class="text-[11px] text-slate-500 hover:text-rose-400 hidden" title="BGM 삭제">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+            <label class="text-[11px] text-indigo-400 hover:text-indigo-300 cursor-pointer">
+              <span id="bgmLabel">음악 파일 선택</span>
+              <input type="file" id="bgmInput" accept="audio/*, .mp3, .wav, .m4a, .aac, .ogg" class="hidden">
+            </label>
+          </div>
+        </div>
+
+        <div id="audioWaveStatus" class="hidden text-[10px] text-emerald-400 font-mono flex items-center gap-1.5 bg-emerald-500/10 px-2 py-1 rounded-md border border-emerald-500/20">
+          <i class="fa-solid fa-waveform animate-pulse"></i>
+          <span>AAC 48kHz 인코딩 준비 완료</span>
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>BGM 볼륨</span>
+            <span id="bgmVolumeVal" class="font-mono">70%</span>
+          </div>
+          <input type="range" id="bgmVolumeSlider" min="0" max="1" step="0.05" value="0.7" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER PREVIEW STAGE -->
+    <section class="flex-1 flex flex-col bg-black/40 items-center justify-between p-4 overflow-hidden relative">
+      <div class="relative flex-1 w-full flex items-center justify-center min-h-0">
+        <div class="relative aspect-[9/16] h-full max-h-full rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-black flex items-center justify-center ring-1 ring-white/5">
+          <canvas id="shortsCanvas" width="1080" height="1920" class="w-full h-full object-contain"></canvas>
+          <div class="absolute top-2.5 left-2.5 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-mono text-slate-300 border border-white/10 pointer-events-none flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> 1080 × 1920 (9:16 Shorts)
+          </div>
+          <div id="transitionNoticeBadge" class="absolute bottom-3 right-3 bg-indigo-600/90 text-white backdrop-blur-md px-2.5 py-1 rounded-md text-[10px] font-semibold opacity-0 transition duration-150 pointer-events-none flex items-center gap-1 shadow-lg">
+            <i class="fa-solid fa-arrows-rotate text-[9px] animate-spin"></i>
+            <span id="transitionNoticeText">트랜지션 중</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Playback Timeline Controller -->
+      <div class="w-full max-w-2xl bg-slate-900/95 border border-slate-800/90 rounded-2xl px-5 py-3 mt-3 backdrop-blur shadow-2xl flex flex-col gap-2">
+        <div class="flex items-center gap-3">
+          <span id="currentTimeLabel" class="text-xs font-mono text-slate-300 w-14 text-right">00:00.0</span>
+          <div class="relative flex-1 flex items-center">
+            <input type="range" id="timelineScrubber" min="0" max="10" step="0.016" value="0" class="w-full h-2 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <span id="totalTimeLabel" class="text-xs font-mono text-slate-400 w-14">00:00.0</span>
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <div class="flex items-center space-x-2">
+            <button id="prevSceneNavBtn" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="이전 씬">
+              <i class="fa-solid fa-backward-step"></i>
+            </button>
+            <button id="playPauseBtn" class="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition shadow-lg shadow-indigo-600/30 active:scale-95">
+              <i class="fa-solid fa-play ml-0.5"></i>
+            </button>
+            <button id="nextSceneNavBtn" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="다음 씬">
+              <i class="fa-solid fa-forward-step"></i>
+            </button>
+          </div>
+
+          <div class="flex items-center space-x-4 text-xs text-slate-400">
+            <label class="flex items-center gap-1.5 cursor-pointer hover:text-slate-200">
+              <input type="checkbox" id="loopPlaybackCheckbox" checked class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0">
+              <span>루프 재생</span>
+            </label>
+            <span id="currentSceneBadge" class="bg-indigo-500/15 text-indigo-300 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-indigo-500/25">
+              씬 1 / 1
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT INSPECTOR PANEL -->
+    <aside class="w-96 border-l border-slate-800/80 bg-slate-900/50 flex flex-col shrink-0 overflow-y-auto">
+      <div class="p-3.5 border-b border-slate-800">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-layer-group text-indigo-400"></i> 타임라인 씬 목록
+          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] text-slate-500 hidden sm:inline"><i class="fa-solid fa-up-down-left-right text-[9px] mr-1"></i>드래그하여 순서 변경</span>
+            <span id="totalScenesCountLabel" class="text-[11px] text-slate-400 font-mono">1개 씬</span>
+          </div>
+        </div>
+        <div id="scenesTabContainer" class="flex gap-2 overflow-x-auto pb-1.5 pt-0.5"></div>
+      </div>
+
+      <div class="p-4 space-y-5 flex-1">
+        <!-- Scene Parameters & Transitions -->
+        <div class="space-y-3 bg-slate-800/30 p-3.5 rounded-2xl border border-slate-800">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-stopwatch text-indigo-400"></i> 현재 씬 & 트랜지션
+            </h2>
+            <button id="duplicateSceneBtn" class="text-[11px] text-slate-400 hover:text-indigo-400 flex items-center gap-1">
+              <i class="fa-regular fa-clone"></i> 씬 복제
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">씬 재생 시간</label>
+              <div class="flex items-center bg-slate-800/80 border border-slate-700/80 rounded-lg px-2.5 py-1.5">
+                <input type="number" id="sceneDurationInput" min="1.0" max="30.0" step="0.5" value="4.0" class="bg-transparent w-full text-xs text-white outline-none">
+                <span class="text-[11px] text-slate-500">초</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">트랜지션 방식</label>
+              <select id="sceneTransitionSelect" class="bg-slate-800/80 border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs text-white w-full outline-none font-medium text-indigo-300">
+                <option value="cell-push">셀 밀어내기 & 교체 (Cell Push)</option>
+                <option value="cell-stagger">셀 시차 슬라이드 (Stagger Slide)</option>
+                <option value="cell-alt">셀 교차 밀어내기 (Alternate Rows)</option>
+                <option value="morph">스무스 모핑 (Smooth Morph)</option>
+                <option value="crossfade">필름 디졸브 (Crossfade)</option>
+                <option value="slide">전체 화면 푸시 (Full Push)</option>
+                <option value="zoomfade">줌 페이드 (Zoom Fade)</option>
+                <option value="cut">즉시 전환 (Cut)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5 pt-1">
+            <div>
+              <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+                <span>전환 오버랩 길이</span>
+                <span id="transDurVal" class="font-mono text-indigo-400">0.7s</span>
+              </div>
+              <input type="range" id="transDurationSlider" min="0.2" max="1.5" step="0.1" value="0.7" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">전환 이징 곡선</label>
+              <select id="transEasingSelect" class="bg-slate-800/80 border border-slate-700/80 rounded-lg px-2 py-1.5 text-xs text-white w-full outline-none">
+                <option value="smoothstep" selected>Smoothstep (기본 / 부드러움)</option>
+                <option value="easeInOutCubic">Ease In Out Cubic</option>
+                <option value="easeInOutQuad">Ease In Out Quad</option>
+                <option value="linear">Linear (등속)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layout Selector Grid -->
+        <div class="space-y-2.5">
+          <label class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>콜라주 분할 레이아웃</span>
+            <span id="activeLayoutName" class="text-[10px] text-indigo-400 font-semibold">상하 2분할</span>
+          </label>
+          <div class="grid grid-cols-6 gap-1.5" id="layoutButtonsContainer"></div>
+        </div>
+
+        <!-- Cell Gap -->
+        <div class="p-3 bg-slate-800/30 rounded-xl border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between text-[11px] text-slate-300 font-semibold">
+            <span>콜라주 테두리 / 간격 (Gap)</span>
+            <span id="cellGapVal" class="text-indigo-400 font-mono">6px</span>
+          </div>
+          <input type="range" id="cellGapSlider" min="0" max="24" step="2" value="6" class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- Cell Configuration List -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-sliders text-indigo-400"></i> 각 셀별 슬라이드 & 모션
+            </h2>
+            <button id="autoAssignImagesBtn" class="text-[10px] text-indigo-400 hover:underline flex items-center gap-1 font-medium" title="현재 보관함에서 순서대로 자동 배치">
+              <i class="fa-solid fa-shuffle"></i> 사진 순차 배정
+            </button>
+          </div>
+
+          <div id="cellsInspectorList" class="space-y-2.5"></div>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- HEIC Batch Modal -->
+  <div id="heicBatchModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col items-center text-center space-y-4">
+      <div class="w-14 h-14 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-2xl animate-spin">
+        <i class="fa-solid fa-circle-notch"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-white">사진 최적화 및 디코딩 중</h3>
+        <p class="text-xs text-slate-400 mt-1">대용량 파일과 HEIC 이미지를 순차적으로 변환 중입니다.</p>
+      </div>
+
+      <div class="w-full space-y-2">
+        <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+          <div id="heicBatchProgressBar" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 w-0 transition-all duration-150"></div>
+        </div>
+        <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+          <span id="heicBatchCountLabel">0 / 0 변환 완료</span>
+          <span id="heicBatchPercentLabel">0%</span>
+        </div>
+      </div>
+      <p id="heicCurrentFileName" class="text-[11px] text-indigo-300 truncate max-w-xs font-mono">파일 준비 중...</p>
+    </div>
+  </div>
+
+  <!-- Video Export Modal with AAC Audio Sync Status -->
+  <div id="exportModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col items-center text-center space-y-4">
+      <div class="w-14 h-14 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-2xl animate-spin">
+        <i class="fa-solid fa-circle-notch"></i>
+      </div>
+      <div>
+        <h3 id="exportModalTitle" class="text-base font-bold text-white">H.264 + AAC MP4 60FPS 하드웨어 인코딩 중</h3>
+        <p class="text-xs text-slate-400 mt-1">비디오와 배경음악(BGM)을 실시간 합성하여 쇼츠 영상을 생성하고 있습니다.</p>
+        <div class="mt-2 flex flex-wrap gap-1.5 justify-center">
+          <div id="exportAudioIndicator" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-[11px] text-purple-300 font-medium">
+            <i class="fa-solid fa-music text-xs"></i> AAC 48kHz BGM 사운드 머징
+          </div>
+          <div id="exportLoopIndicator" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[11px] text-emerald-300 font-medium">
+            <i class="fa-solid fa-infinity text-xs"></i> 무한 루프(Seamless Loop) 위상 보정
+          </div>
+        </div>
+      </div>
+
+      <div class="w-full space-y-2">
+        <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-slate-700">
+          <div id="exportProgressBar" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 w-0 transition-all duration-75"></div>
+        </div>
+        <div class="flex justify-between text-[11px] text-slate-400 font-mono">
+          <span id="exportProgressPct">0%</span>
+          <span id="exportProgressTime">0.0s / 0.0s</span>
+        </div>
+      </div>
+
+      <div class="flex gap-2 w-full pt-1">
+        <button id="cancelExportBtn" class="flex-1 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          인코딩 취소
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug Error Modal -->
+  <div id="debugErrorModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden">
+    <div class="bg-slate-900 border border-rose-800/80 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+      <div class="flex items-center gap-2.5 text-rose-400">
+        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+        <h3 class="text-base font-bold text-white">이미지 변환 중 오류 발생</h3>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">
+        파일 처리 중 예외가 발생했습니다. 아래 디버그 정보를 확인하거나 보고서 파일로 다운로드할 수 있습니다.
+      </p>
+      <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] font-mono text-slate-300 max-h-48 overflow-y-auto whitespace-pre-wrap" id="debugErrorLogText"></div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="downloadDebugReportBtn" class="px-3 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition flex items-center gap-1.5">
+          <i class="fa-solid fa-file-arrow-down"></i> 오류 보고서 (.txt) 다운로드
+        </button>
+        <button id="closeDebugModalBtn" class="px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition">
+          닫기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 px-4 py-2.5 bg-slate-800/95 border border-slate-700 text-white rounded-xl text-xs shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-indigo-400"></i>
+    <span id="toastMsg">알림 메시지</span>
+  </div>
+
+  <script>
+    const CANVAS_WIDTH = 1080;
+    const CANVAS_HEIGHT = 1920;
+    const DB_NAME = 'ShortsCollageStudioDB_v11';
+    const DB_VERSION = 1;
+
+    // Requested motion defaults
+    const DEFAULT_MOTION = 'zoom-out';
+    const DEFAULT_EASING = 'smoothstep';
+    const DEFAULT_ZOOM_FACTOR = 1.3;
+
+    // Main Canvas Elements
+    const mainCanvas = document.getElementById('shortsCanvas');
+    const mainCtx = mainCanvas.getContext('2d', { alpha: false });
+    mainCtx.imageSmoothingEnabled = true;
+    mainCtx.imageSmoothingQuality = 'high';
+
+    // Double Buffering Offscreen Canvas Buffers
+    const offscreenA = document.createElement('canvas');
+    offscreenA.width = CANVAS_WIDTH;
+    offscreenA.height = CANVAS_HEIGHT;
+    const offCtxA = offscreenA.getContext('2d', { alpha: false });
+    offCtxA.imageSmoothingEnabled = true;
+    offCtxA.imageSmoothingQuality = 'high';
+
+    const offscreenB = document.createElement('canvas');
+    offscreenB.width = CANVAS_WIDTH;
+    offscreenB.height = CANVAS_HEIGHT;
+    const offCtxB = offscreenB.getContext('2d', { alpha: false });
+    offCtxB.imageSmoothingEnabled = true;
+    offCtxB.imageSmoothingQuality = 'high';
+
+    // 6 Collage Layout Presets
+    const LAYOUT_PRESETS = [
+      {
+        id: 'split-1',
+        name: '1단 전체',
+        icon: '<div class="w-full h-full bg-slate-600 rounded-sm"></div>',
+        cells: [{ x: 0, y: 0, w: 1, h: 1 }]
+      },
+      {
+        id: 'split-2v',
+        name: '상하 2분할 (50:50)',
+        icon: '<div class="w-full h-full flex flex-col gap-0.5"><div class="flex-1 bg-slate-600 rounded-sm"></div><div class="flex-1 bg-slate-600 rounded-sm"></div></div>',
+        cells: [
+          { x: 0, y: 0, w: 1, h: 0.5 },
+          { x: 0, y: 0.5, w: 1, h: 0.5 }
+        ]
+      },
+      {
+        id: 'split-3v',
+        name: '상하 3분할 (파노라마)',
+        icon: '<div class="w-full h-full flex flex-col gap-0.5"><div class="flex-1 bg-slate-600 rounded-sm"></div><div class="flex-1 bg-slate-600 rounded-sm"></div><div class="flex-1 bg-slate-600 rounded-sm"></div></div>',
+        cells: [
+          { x: 0, y: 0, w: 1, h: 0.33333 },
+          { x: 0, y: 0.33333, w: 1, h: 0.33334 },
+          { x: 0, y: 0.66667, w: 1, h: 0.33333 }
+        ]
+      },
+      {
+        id: 'grid-4',
+        name: '2×2 쿼드 그리드',
+        icon: '<div class="w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5"><div class="bg-slate-600 rounded-sm"></div><div class="bg-slate-600 rounded-sm"></div><div class="bg-slate-600 rounded-sm"></div><div class="bg-slate-600 rounded-sm"></div></div>',
+        cells: [
+          { x: 0, y: 0, w: 0.5, h: 0.5 },
+          { x: 0.5, y: 0, w: 0.5, h: 0.5 },
+          { x: 0, y: 0.5, w: 0.5, h: 0.5 },
+          { x: 0.5, y: 0.5, w: 0.5, h: 0.5 }
+        ]
+      },
+      {
+        id: 'asymmetric-top',
+        name: '상단 와이드 + 2분할',
+        icon: '<div class="w-full h-full flex flex-col gap-0.5"><div class="h-1/2 bg-slate-600 rounded-sm"></div><div class="h-1/2 flex gap-0.5"><div class="flex-1 bg-slate-600 rounded-sm"></div><div class="flex-1 bg-slate-600 rounded-sm"></div></div></div>',
+        cells: [
+          { x: 0, y: 0, w: 1, h: 0.54 },
+          { x: 0, y: 0.54, w: 0.5, h: 0.46 },
+          { x: 0.5, y: 0.54, w: 0.5, h: 0.46 }
+        ]
+      },
+      {
+        id: 'asymmetric-bottom',
+        name: '상단 2분할 + 하단 와이드',
+        icon: '<div class="w-full h-full flex flex-col gap-0.5"><div class="h-1/2 flex gap-0.5"><div class="flex-1 bg-slate-600 rounded-sm"></div><div class="flex-1 bg-slate-600 rounded-sm"></div></div><div class="h-1/2 bg-slate-600 rounded-sm"></div></div>',
+        cells: [
+          { x: 0, y: 0, w: 0.5, h: 0.46 },
+          { x: 0.5, y: 0.5, w: 0.5, h: 0.46 },
+          { x: 0, y: 0.46, w: 1, h: 0.54 }
+        ]
+      }
+    ];
+
+    const EASING_FUNCTIONS = {
+      smoothstep: (t) => t * t * (3 - 2 * t),
+      easeInOutCubic: (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+      easeInOutQuad: (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+      easeOutQuad: (t) => 1 - (1 - t) * (1 - t),
+      linear: (t) => t
+    };
+
+    const state = {
+      assets: [],
+      scenes: [],
+      currentSceneIndex: 0,
+      currentTime: 0,
+      isPlaying: false,
+      loop: true,
+      seamlessLoopMode: true,
+      exportFormat: 'mp4', // 'mp4' (default, H.264+AAC) or 'webm'
+      cellGap: 6,
+      audio: {
+        blob: null,
+        name: null,
+        element: null,
+        volume: 0.7,
+        dataUrl: null,
+        audioBuffer: null // Decoded AudioBuffer for WebCodecs AAC encoding
+      },
+      audioCtx: null,
+      gainNode: null,
+      animationFrameId: null,
+      lastTickTimestamp: 0,
+      isExporting: false,
+      recorder: null
+    };
+
+    let latestDebugText = '';
+
+    // DOM References
+    const toggleLoopModeBtn = document.getElementById('toggleLoopModeBtn');
+    const loopModeStatusLabel = document.getElementById('loopModeStatusLabel');
+    const formatMp4Btn = document.getElementById('formatMp4Btn');
+    const formatWebmBtn = document.getElementById('formatWebmBtn');
+    const exportBtnLabel = document.getElementById('exportBtnLabel');
+    const exportModalTitle = document.getElementById('exportModalTitle');
+    const triggerUploadBtn = document.getElementById('triggerUploadBtn');
+    const multiImageInput = document.getElementById('multiImageInput');
+    const dropZone = document.getElementById('dropZone');
+    const galleryContainer = document.getElementById('galleryContainer');
+    const assetCountBadge = document.getElementById('assetCountBadge');
+    const quickDistributeBtn = document.getElementById('quickDistributeBtn');
+    const bgmInput = document.getElementById('bgmInput');
+    const bgmLabel = document.getElementById('bgmLabel');
+    const removeBgmBtn = document.getElementById('removeBgmBtn');
+    const audioWaveStatus = document.getElementById('audioWaveStatus');
+    const bgmVolumeSlider = document.getElementById('bgmVolumeSlider');
+    const bgmVolumeVal = document.getElementById('bgmVolumeVal');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const timelineScrubber = document.getElementById('timelineScrubber');
+    const currentTimeLabel = document.getElementById('currentTimeLabel');
+    const totalTimeLabel = document.getElementById('totalTimeLabel');
+    const prevSceneNavBtn = document.getElementById('prevSceneNavBtn');
+    const nextSceneNavBtn = document.getElementById('nextSceneNavBtn');
+    const loopPlaybackCheckbox = document.getElementById('loopPlaybackCheckbox');
+    const currentSceneBadge = document.getElementById('currentSceneBadge');
+    const scenesTabContainer = document.getElementById('scenesTabContainer');
+    const totalScenesCountLabel = document.getElementById('totalScenesCountLabel');
+    const addSceneBtn = document.getElementById('addSceneBtn');
+    const duplicateSceneBtn = document.getElementById('duplicateSceneBtn');
+    const sceneDurationInput = document.getElementById('sceneDurationInput');
+    const sceneTransitionSelect = document.getElementById('sceneTransitionSelect');
+    const transDurationSlider = document.getElementById('transDurationSlider');
+    const transDurVal = document.getElementById('transDurVal');
+    const transEasingSelect = document.getElementById('transEasingSelect');
+    const activeLayoutName = document.getElementById('activeLayoutName');
+    const layoutButtonsContainer = document.getElementById('layoutButtonsContainer');
+    const cellGapSlider = document.getElementById('cellGapSlider');
+    const cellGapVal = document.getElementById('cellGapVal');
+    const cellsInspectorList = document.getElementById('cellsInspectorList');
+    const autoAssignImagesBtn = document.getElementById('autoAssignImagesBtn');
+    const resetStorageBtn = document.getElementById('resetStorageBtn');
+    const exportProjectBtn = document.getElementById('exportProjectBtn');
+    const importProjectInput = document.getElementById('importProjectInput');
+    const exportVideoBtn = document.getElementById('exportVideoBtn');
+    const cancelExportBtn = document.getElementById('cancelExportBtn');
+    const transitionNoticeBadge = document.getElementById('transitionNoticeBadge');
+    const transitionNoticeText = document.getElementById('transitionNoticeText');
+
+    // Modals
+    const heicBatchModal = document.getElementById('heicBatchModal');
+    const heicBatchProgressBar = document.getElementById('heicBatchProgressBar');
+    const heicBatchCountLabel = document.getElementById('heicBatchCountLabel');
+    const heicBatchPercentLabel = document.getElementById('heicBatchPercentLabel');
+    const heicCurrentFileName = document.getElementById('heicCurrentFileName');
+    const exportModal = document.getElementById('exportModal');
+    const exportProgressBar = document.getElementById('exportProgressBar');
+    const exportProgressPct = document.getElementById('exportProgressPct');
+    const exportProgressTime = document.getElementById('exportProgressTime');
+    const exportAudioIndicator = document.getElementById('exportAudioIndicator');
+    const exportLoopIndicator = document.getElementById('exportLoopIndicator');
+    const debugErrorModal = document.getElementById('debugErrorModal');
+    const debugErrorLogText = document.getElementById('debugErrorLogText');
+    const downloadDebugReportBtn = document.getElementById('downloadDebugReportBtn');
+    const closeDebugModalBtn = document.getElementById('closeDebugModalBtn');
+
+    function createDefaultCellConfig(assetId) {
+      return {
+        assetId: assetId || (state.assets[0]?.id || null),
+        motion: DEFAULT_MOTION,
+        easing: DEFAULT_EASING,
+        zoomFactor: DEFAULT_ZOOM_FACTOR,
+        startPoint: 0,
+        endPoint: 100
+      };
+    }
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('assets')) {
+            db.createObjectStore('assets', { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains('project')) {
+            db.createObjectStore('project', { keyPath: 'key' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbSaveAsset(asset) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction('assets', 'readwrite');
+        tx.objectStore('assets').put({
+          id: asset.id,
+          name: asset.name,
+          dataUrl: asset.dataUrl,
+          width: asset.width || 0,
+          height: asset.height || 0
+        });
+        return new Promise(res => { tx.oncomplete = () => res(true); });
+      } catch (e) {
+        console.warn('DB Save Asset Failed:', e);
+      }
+    }
+
+    async function dbGetAllAssets() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction('assets', 'readonly');
+        const req = tx.objectStore('assets').getAll();
+        return new Promise((res, rej) => {
+          req.onsuccess = () => res(req.result || []);
+          req.onerror = () => rej(req.error);
+        });
+      } catch (e) {
+        return [];
+      }
+    }
+
+    async function dbDeleteAsset(id) {
+      try {
+        const db = await openDB();
+        const tx = db.transaction('assets', 'readwrite');
+        tx.objectStore('assets').delete(id);
+      } catch (e) {}
+    }
+
+    async function dbSaveProjectState() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction('project', 'readwrite');
+        const store = tx.objectStore('project');
+        store.put({
+          key: 'scenesConfig',
+          data: {
+            scenes: state.scenes,
+            currentSceneIndex: state.currentSceneIndex,
+            cellGap: state.cellGap,
+            seamlessLoopMode: state.seamlessLoopMode,
+            exportFormat: state.exportFormat
+          }
+        });
+        if (state.audio.dataUrl) {
+          store.put({
+            key: 'audioTrack',
+            data: {
+              dataUrl: state.audio.dataUrl,
+              name: state.audio.name,
+              volume: state.audio.volume
+            }
+          });
+        } else {
+          store.delete('audioTrack');
+        }
+      } catch (e) {
+        console.warn('DB Save Project Failed:', e);
+      }
+    }
+
+    async function dbLoadProjectState() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction('project', 'readonly');
+        const store = tx.objectStore('project');
+        const reqCfg = store.get('scenesConfig');
+        const reqAudio = store.get('audioTrack');
+
+        const [cfg, audio] = await Promise.all([
+          new Promise(r => { reqCfg.onsuccess = () => r(reqCfg.result ? reqCfg.result.data : null); }),
+          new Promise(r => { reqAudio.onsuccess = () => r(reqAudio.result ? reqAudio.result.data : null); })
+        ]);
+
+        return { scenesConfig: cfg, audioTrack: audio };
+      } catch (e) {
+        return { scenesConfig: null, audioTrack: null };
+      }
+    }
+
+    async function dbClearAll() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(['assets', 'project'], 'readwrite');
+        tx.objectStore('assets').clear();
+        tx.objectStore('project').clear();
+        return new Promise(res => { tx.oncomplete = () => res(); });
+      } catch (e) {}
+    }
+
+    function readFileAsDataURL(fileOrBlob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+        reader.readAsDataURL(fileOrBlob);
+      });
+    }
+
+    function readFileAsArrayBuffer(fileOrBlob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+        reader.readAsArrayBuffer(fileOrBlob);
+      });
+    }
+
+    function loadImageElement(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Image failed to decode from DataURL'));
+        img.src = dataUrl;
+      });
+    }
+
+    function isHeicFile(file) {
+      const name = (file.name || '').toLowerCase();
+      const type = (file.type || '').toLowerCase();
+      return name.endsWith('.heic') || name.endsWith('.heif') || type.includes('heic') || type.includes('heif');
+    }
+
+    async function convertHeicToJpegBlob(file) {
+      if (window.createImageBitmap) {
+        try {
+          const bmp = await createImageBitmap(file);
+          const c = document.createElement('canvas');
+          c.width = bmp.width;
+          c.height = bmp.height;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(bmp, 0, 0);
+          bmp.close();
+          const jpegBlob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.92));
+          if (jpegBlob) return jpegBlob;
+        } catch (e) {}
+      }
+
+      if (typeof heic2any === 'function') {
+        const result = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: 0.92
+        });
+        return Array.isArray(result) ? result[0] : result;
+      }
+
+      throw new Error('HEIC decoding engine is not available');
+    }
+
+    async function handleFiles(fileList) {
+      const files = Array.from(fileList || []).filter(f => f instanceof File || f instanceof Blob);
+      if (files.length === 0) return;
+
+      const totalFiles = files.length;
+      let processedCount = 0;
+      let successCount = 0;
+
+      heicBatchModal.classList.remove('hidden');
+      heicBatchProgressBar.style.width = '0%';
+      heicBatchPercentLabel.textContent = '0%';
+      heicBatchCountLabel.textContent = `0 / ${totalFiles} 처리 완료`;
+
+      for (let i = 0; i < totalFiles; i++) {
+        const file = files[i];
+        const displayName = file.name || `photo_${Date.now()}_${i}.jpg`;
+        heicCurrentFileName.textContent = `${displayName} 처리 중...`;
+
+        try {
+          let dataUrl = '';
+          if (isHeicFile(file)) {
+            const jpegBlob = await convertHeicToJpegBlob(file);
+            dataUrl = await readFileAsDataURL(jpegBlob);
+          } else {
+            dataUrl = await readFileAsDataURL(file);
+          }
+
+          const imgElem = await loadImageElement(dataUrl);
+          const assetObj = {
+            id: 'asset_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+            name: displayName,
+            dataUrl: dataUrl,
+            width: imgElem.width,
+            height: imgElem.height,
+            imgElement: imgElem
+          };
+
+          state.assets.push(assetObj);
+          await dbSaveAsset(assetObj);
+          successCount++;
+
+          autoFillAssetIntoScenes(assetObj.id);
+
+        } catch (err) {
+          console.error(`File processing error [${displayName}]:`, err);
+          showDebugReportModal(file, err);
+        }
+
+        processedCount++;
+        const pct = Math.round((processedCount / totalFiles) * 100);
+        heicBatchProgressBar.style.width = `${pct}%`;
+        heicBatchPercentLabel.textContent = `${pct}%`;
+        heicBatchCountLabel.textContent = `${processedCount} / ${totalFiles} 처리 완료`;
+
+        await new Promise(r => setTimeout(r, 40));
+      }
+
+      heicBatchModal.classList.add('hidden');
+      renderGallery();
+      updateSceneInspectorUI();
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+
+      if (successCount > 0) {
+        showToast(`${successCount}장의 사진이 보관함에 등록되었습니다.`);
+      }
+    }
+
+    function autoFillAssetIntoScenes(newAssetId) {
+      if (state.scenes.length === 0) return;
+      for (const sc of state.scenes) {
+        for (const cell of sc.cells) {
+          if (!cell.assetId) {
+            cell.assetId = newAssetId;
+            return;
+          }
+        }
+      }
+    }
+
+    function showDebugReportModal(file, err) {
+      latestDebugText = `[Shorts Collage Studio Debug Log]\n` +
+        `Time: ${new Date().toISOString()}\n` +
+        `File Name: ${file.name || 'unnamed'}\n` +
+        `File Size: ${file.size || 'unknown'} bytes\n` +
+        `File Type: ${file.type || 'unknown'}\n` +
+        `User Agent: ${navigator.userAgent}\n` +
+        `Error Message: ${err.message || err}\n` +
+        `Error Stack: ${err.stack || 'No stack'}\n`;
+
+      debugErrorLogText.textContent = latestDebugText;
+      debugErrorModal.classList.remove('hidden');
+    }
+
+    downloadDebugReportBtn.addEventListener('click', () => {
+      const blob = new Blob([latestDebugText], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `heic_debug_error_report_${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+
+    closeDebugModalBtn.addEventListener('click', () => {
+      debugErrorModal.classList.add('hidden');
+    });
+
+    function buildTimelineSchedule() {
+      const schedule = [];
+      if (state.scenes.length === 0) return schedule;
+
+      let currentGlobalStart = 0;
+      const count = state.scenes.length;
+
+      for (let i = 0; i < count; i++) {
+        const sc = state.scenes[i];
+        const hasNext = (i < count - 1) || (state.seamlessLoopMode && count > 1);
+        let transDur = 0;
+
+        if (hasNext && sc.transition && sc.transition !== 'cut') {
+          const requestedTrans = sc.transitionDuration !== undefined ? sc.transitionDuration : 0.7;
+          const nextSc = (i < count - 1) ? state.scenes[i + 1] : state.scenes[0];
+          transDur = Math.min(requestedTrans, sc.duration * 0.8, nextSc.duration * 0.8);
+        }
+
+        const nextSceneObj = (i < count - 1) ? state.scenes[i + 1] : (state.seamlessLoopMode ? state.scenes[0] : null);
+        const nextSceneIdx = (i < count - 1) ? (i + 1) : 0;
+
+        schedule.push({
+          sceneIndex: i,
+          scene: sc,
+          globalStartTime: currentGlobalStart,
+          duration: sc.duration,
+          globalEndTime: currentGlobalStart + sc.duration,
+          transDuration: transDur,
+          transStartTime: currentGlobalStart + sc.duration - transDur,
+          nextScene: nextSceneObj,
+          nextSceneIndex: nextSceneIdx
+        });
+
+        currentGlobalStart += (sc.duration - transDur);
+      }
+
+      return schedule;
+    }
+
+    function getTotalDuration() {
+      if (state.scenes.length === 0) return 0;
+      const schedule = buildTimelineSchedule();
+      if (schedule.length === 0) return 0;
+
+      if (state.seamlessLoopMode && state.scenes.length > 1) {
+        const lastItem = schedule[schedule.length - 1];
+        return Math.max(0.1, lastItem.transStartTime + lastItem.transDuration - schedule[0].globalStartTime);
+      } else {
+        const lastEntry = schedule[schedule.length - 1];
+        return Math.max(0.1, lastEntry.globalEndTime);
+      }
+    }
+
+    function getTimelineStateAtTime(globalT) {
+      if (state.scenes.length === 0) return null;
+      const schedule = buildTimelineSchedule();
+      if (schedule.length === 0) return null;
+
+      const totalDur = getTotalDuration();
+      let normT = globalT;
+
+      if (state.seamlessLoopMode && state.scenes.length > 1) {
+        normT = ((globalT % totalDur) + totalDur) % totalDur;
+      } else {
+        normT = Math.min(Math.max(0, globalT), totalDur);
+      }
+
+      for (let i = 0; i < schedule.length; i++) {
+        const item = schedule[i];
+        const hasTransition = item.transDuration > 0 && item.nextScene !== null;
+
+        if (hasTransition && normT >= item.transStartTime && normT < item.transStartTime + item.transDuration) {
+          const transProgress = (normT - item.transStartTime) / item.transDuration;
+
+          const localTimeA = normT - item.globalStartTime;
+          const progA = Math.min(Math.max(0, localTimeA / item.duration), 1.0);
+
+          let progB = 0;
+          if (item.nextSceneIndex === 0 && i === schedule.length - 1) {
+            progB = Math.min(Math.max(0, (normT - item.transStartTime) / item.nextScene.duration), 1.0);
+          } else {
+            const nextItem = schedule[item.nextSceneIndex];
+            const localTimeB = normT - nextItem.globalStartTime;
+            progB = Math.min(Math.max(0, localTimeB / nextItem.duration), 1.0);
+          }
+
+          return {
+            isTransition: true,
+            sceneA: item.scene,
+            sceneB: item.nextScene,
+            indexA: item.sceneIndex,
+            indexB: item.nextSceneIndex,
+            progA: progA,
+            progB: progB,
+            transProgress: transProgress,
+            activeSceneIndex: transProgress < 0.5 ? item.sceneIndex : item.nextSceneIndex
+          };
+        }
+
+        if (normT >= item.globalStartTime && (normT < item.transStartTime || !hasTransition)) {
+          const localTime = normT - item.globalStartTime;
+          const prog = Math.min(Math.max(0, localTime / item.duration), 1.0);
+          return {
+            isTransition: false,
+            scene: item.scene,
+            index: item.sceneIndex,
+            prog: prog,
+            activeSceneIndex: item.sceneIndex
+          };
+        }
+      }
+
+      const lastItem = schedule[schedule.length - 1];
+      return {
+        isTransition: false,
+        scene: lastItem.scene,
+        index: lastItem.sceneIndex,
+        prog: 1.0,
+        activeSceneIndex: lastItem.sceneIndex
+      };
+    }
+
+    function formatTime(sec) {
+      const mins = Math.floor(sec / 60);
+      const secs = Math.floor(sec % 60);
+      const ms = Math.floor((sec % 1) * 10);
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${ms}`;
+    }
+
+    function renderSceneToContext(tCtx, scene, progress) {
+      tCtx.fillStyle = '#05070d';
+      tCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const preset = LAYOUT_PRESETS.find(p => p.id === scene.layoutId) || LAYOUT_PRESETS[1];
+      const gap = state.cellGap;
+
+      for (let i = 0; i < preset.cells.length; i++) {
+        const norm = preset.cells[i];
+        const cellCfg = scene.cells[i] || createDefaultCellConfig(state.assets[i % (state.assets.length || 1)]?.id);
+
+        const px = norm.x * CANVAS_WIDTH;
+        const py = norm.y * CANVAS_HEIGHT;
+        const pw = norm.w * CANVAS_WIDTH;
+        const ph = norm.h * CANVAS_HEIGHT;
+
+        drawSingleCell(tCtx, px, py, pw, ph, gap, cellCfg, progress);
+      }
+    }
+
+    function drawSingleCell(tCtx, rx, ry, rw, rh, gap, config, rawProg) {
+      const x = rx + gap;
+      const y = ry + gap;
+      const w = Math.max(2, rw - gap * 2);
+      const h = Math.max(2, rh - gap * 2);
+
+      tCtx.save();
+      tCtx.beginPath();
+      tCtx.rect(x, y, w, h);
+      tCtx.clip();
+
+      const asset = state.assets.find(a => a.id === config.assetId) || state.assets[0];
+
+      if (!asset || !asset.imgElement) {
+        const grad = tCtx.createLinearGradient(x, y, x + w, y + h);
+        grad.addColorStop(0, '#111827');
+        grad.addColorStop(1, '#0b0f19');
+        tCtx.fillStyle = grad;
+        tCtx.fillRect(x, y, w, h);
+
+        tCtx.fillStyle = '#475569';
+        tCtx.font = '600 24px Pretendard, sans-serif';
+        tCtx.textAlign = 'center';
+        tCtx.textBaseline = 'middle';
+        tCtx.fillText('사진을 추가해주세요', x + w / 2, y + h / 2);
+        tCtx.restore();
+        return;
+      }
+
+      const img = asset.imgElement;
+      const easeFn = EASING_FUNCTIONS[config.easing] || EASING_FUNCTIONS.smoothstep;
+      const easedT = easeFn(Math.min(Math.max(0, rawProg), 1));
+      
+      const startP = (config.startPoint !== undefined ? config.startPoint : 0) / 100;
+      const endP = (config.endPoint !== undefined ? config.endPoint : 100) / 100;
+      const effectiveP = startP + (endP - startP) * easedT;
+
+      const zoom = config.zoomFactor !== undefined ? config.zoomFactor : DEFAULT_ZOOM_FACTOR;
+      const baseScale = Math.max(w / img.width, h / img.height);
+      const curW = img.width * baseScale;
+      const curH = img.height * baseScale;
+
+      const maxDx = Math.max(0, curW - w);
+      const maxDy = Math.max(0, curH - h);
+
+      // True center coordinates of this cell slot
+      const cellCenterX = x + w / 2;
+      const cellCenterY = y + h / 2;
+
+      switch (config.motion) {
+        case 'zoom-out': {
+          // Center-anchored zoom out from initial zoom (1.3x) down towards 1.0x
+          const zScale = zoom - ((zoom - 1.0) * effectiveP);
+          tCtx.save();
+          tCtx.translate(cellCenterX, cellCenterY);
+          tCtx.scale(zScale, zScale);
+          tCtx.drawImage(img, -curW / 2, -curH / 2, curW, curH);
+          tCtx.restore();
+          break;
+        }
+        case 'zoom-in': {
+          // Center-anchored zoom in from 1.0x up towards zoom
+          const zScale = 1.0 + ((zoom - 1.0) * effectiveP);
+          tCtx.save();
+          tCtx.translate(cellCenterX, cellCenterY);
+          tCtx.scale(zScale, zScale);
+          tCtx.drawImage(img, -curW / 2, -curH / 2, curW, curH);
+          tCtx.restore();
+          break;
+        }
+        case 'slide-lr': {
+          const currentShiftX = -maxDx + (maxDx * effectiveP);
+          tCtx.drawImage(img, x + currentShiftX, y - maxDy / 2, curW, curH);
+          break;
+        }
+        case 'slide-rl': {
+          const currentShiftX = -(maxDx * effectiveP);
+          tCtx.drawImage(img, x + currentShiftX, y - maxDy / 2, curW, curH);
+          break;
+        }
+        case 'slide-tb': {
+          const currentShiftY = -maxDy + (maxDy * effectiveP);
+          tCtx.drawImage(img, x - maxDx / 2, y + currentShiftY, curW, curH);
+          break;
+        }
+        case 'slide-bt': {
+          const currentShiftY = -(maxDy * effectiveP);
+          tCtx.drawImage(img, x - maxDx / 2, y + currentShiftY, curW, curH);
+          break;
+        }
+        case 'diagonal': {
+          const currentShiftX = -maxDx + (maxDx * effectiveP);
+          const currentShiftY = -maxDy + (maxDy * effectiveP);
+          tCtx.drawImage(img, x + currentShiftX, y + currentShiftY, curW, curH);
+          break;
+        }
+        default: {
+          tCtx.drawImage(img, x - maxDx / 2, y - maxDy / 2, curW, curH);
+        }
+      }
+
+      applyCellVignette(tCtx, x, y, w, h);
+      tCtx.restore();
+    }
+
+    function applyCellVignette(tCtx, x, y, w, h) {
+      const grad = tCtx.createLinearGradient(x, y, x, y + h);
+      grad.addColorStop(0, 'rgba(0,0,0,0.14)');
+      grad.addColorStop(0.12, 'rgba(0,0,0,0)');
+      grad.addColorStop(0.88, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(0,0,0,0.24)');
+      tCtx.fillStyle = grad;
+      tCtx.fillRect(x, y, w, h);
+    }
+
+    function renderMainCanvas(t) {
+      if (state.scenes.length === 0) {
+        mainCtx.fillStyle = '#05070d';
+        mainCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        return;
+      }
+
+      const tState = getTimelineStateAtTime(t);
+      if (!tState) return;
+
+      if (tState.isTransition) {
+        const { sceneA, sceneB, progA, progB, transProgress } = tState;
+        const easeMethod = EASING_FUNCTIONS[sceneA.transitionEasing] || EASING_FUNCTIONS.smoothstep;
+        const blend = easeMethod(Math.min(Math.max(0, transProgress), 1));
+
+        transitionNoticeBadge.style.opacity = '1';
+        transitionNoticeText.textContent = `${sceneA.transition.toUpperCase()} 전환 중 (${Math.round(blend * 100)}%)`;
+
+        if (sceneA.transition === 'cell-push' || sceneA.transition === 'cell-stagger' || sceneA.transition === 'cell-alt') {
+          renderCellPushTransition(sceneA, sceneB, progA, progB, blend, sceneA.transition);
+        } else if (sceneA.transition === 'morph') {
+          renderMorphTransition(sceneA, sceneB, progA, progB, blend);
+        } else if (sceneA.transition === 'slide') {
+          renderSceneToContext(offCtxA, sceneA, progA);
+          renderSceneToContext(offCtxB, sceneB, progB);
+
+          mainCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+          const slideOffsetX = CANVAS_WIDTH * blend;
+          mainCtx.drawImage(offscreenA, -slideOffsetX, 0);
+          mainCtx.drawImage(offscreenB, CANVAS_WIDTH - slideOffsetX, 0);
+        } else if (sceneA.transition === 'zoomfade') {
+          renderSceneToContext(offCtxA, sceneA, progA);
+          renderSceneToContext(offCtxB, sceneB, progB);
+
+          mainCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+          mainCtx.save();
+          const scaleA = 1 + (0.15 * blend);
+          mainCtx.globalAlpha = 1 - blend;
+          mainCtx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+          mainCtx.scale(scaleA, scaleA);
+          mainCtx.drawImage(offscreenA, -CANVAS_WIDTH / 2, -CANVAS_HEIGHT / 2);
+          mainCtx.restore();
+
+          mainCtx.save();
+          const scaleB = 0.9 + (0.1 * blend);
+          mainCtx.globalAlpha = blend;
+          mainCtx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+          mainCtx.scale(scaleB, scaleB);
+          mainCtx.drawImage(offscreenB, -CANVAS_WIDTH / 2, -CANVAS_HEIGHT / 2);
+          mainCtx.restore();
+        } else if (sceneA.transition === 'crossfade') {
+          renderSceneToContext(offCtxA, sceneA, progA);
+          renderSceneToContext(offCtxB, sceneB, progB);
+
+          mainCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+          mainCtx.globalAlpha = 1.0;
+          mainCtx.drawImage(offscreenA, 0, 0);
+          mainCtx.globalAlpha = blend;
+          mainCtx.drawImage(offscreenB, 0, 0);
+          mainCtx.globalAlpha = 1.0;
+        } else {
+          renderSceneToContext(mainCtx, sceneA, progA);
+        }
+      } else {
+        transitionNoticeBadge.style.opacity = '0';
+        renderSceneToContext(mainCtx, tState.scene, tState.prog);
+      }
+    }
+
+    function renderCellPushTransition(sceneA, sceneB, progA, progB, rawBlend, mode) {
+      mainCtx.fillStyle = '#05070d';
+      mainCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const presetA = LAYOUT_PRESETS.find(p => p.id === sceneA.layoutId) || LAYOUT_PRESETS[1];
+      const presetB = LAYOUT_PRESETS.find(p => p.id === sceneB.layoutId) || LAYOUT_PRESETS[1];
+      const gap = state.cellGap;
+
+      presetA.cells.forEach((normA, idx) => {
+        const cellCfgA = sceneA.cells[idx] || sceneA.cells[0];
+        const px = normA.x * CANVAS_WIDTH;
+        const py = normA.y * CANVAS_HEIGHT;
+        const pw = normA.w * CANVAS_WIDTH;
+        const ph = normA.h * CANVAS_HEIGHT;
+
+        let cellBlend = rawBlend;
+        if (mode === 'cell-stagger') {
+          const delay = (idx / Math.max(1, presetA.cells.length)) * 0.35;
+          cellBlend = Math.min(Math.max((rawBlend - delay) / (1 - 0.35), 0), 1);
+        }
+
+        let pushDirX = -1;
+        if (mode === 'cell-alt') {
+          pushDirX = idx % 2 === 0 ? -1 : 1;
+        }
+
+        const easePush = EASING_FUNCTIONS.smoothstep(cellBlend);
+        const shiftX = pushDirX * pw * easePush;
+
+        mainCtx.save();
+        mainCtx.beginPath();
+        mainCtx.rect(px + gap, py + gap, Math.max(2, pw - gap * 2), Math.max(2, ph - gap * 2));
+        mainCtx.clip();
+
+        drawSingleCell(mainCtx, px + shiftX, py, pw, ph, gap, cellCfgA, progA);
+        mainCtx.restore();
+      });
+
+      presetB.cells.forEach((normB, idx) => {
+        const cellCfgB = sceneB.cells[idx] || sceneB.cells[0];
+        const px = normB.x * CANVAS_WIDTH;
+        const py = normB.y * CANVAS_HEIGHT;
+        const pw = normB.w * CANVAS_WIDTH;
+        const ph = normB.h * CANVAS_HEIGHT;
+
+        let cellBlend = rawBlend;
+        if (mode === 'cell-stagger') {
+          const delay = (idx / Math.max(1, presetB.cells.length)) * 0.35;
+          cellBlend = Math.min(Math.max((rawBlend - delay) / (1 - 0.35), 0), 1);
+        }
+
+        let inDirX = 1;
+        if (mode === 'cell-alt') {
+          inDirX = idx % 2 === 0 ? 1 : -1;
+        }
+
+        const easeIn = EASING_FUNCTIONS.smoothstep(cellBlend);
+        const enterShiftX = inDirX * pw * (1 - easeIn);
+
+        mainCtx.save();
+        mainCtx.beginPath();
+        mainCtx.rect(px + gap, py + gap, Math.max(2, pw - gap * 2), Math.max(2, ph - gap * 2));
+        mainCtx.clip();
+
+        drawSingleCell(mainCtx, px + enterShiftX, py, pw, ph, gap, cellCfgB, progB);
+        mainCtx.restore();
+      });
+    }
+
+    function renderMorphTransition(sceneA, sceneB, progA, progB, morphFactor) {
+      mainCtx.fillStyle = '#05070d';
+      mainCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const presetA = LAYOUT_PRESETS.find(p => p.id === sceneA.layoutId) || LAYOUT_PRESETS[1];
+      const presetB = LAYOUT_PRESETS.find(p => p.id === sceneB.layoutId) || LAYOUT_PRESETS[1];
+      const maxSlots = Math.max(presetA.cells.length, presetB.cells.length);
+      const gap = state.cellGap;
+
+      for (let i = 0; i < maxSlots; i++) {
+        const normA = presetA.cells[i] || presetA.cells[presetA.cells.length - 1];
+        const normB = presetB.cells[i] || presetB.cells[presetB.cells.length - 1];
+
+        const mx = normA.x + (normB.x - normA.x) * morphFactor;
+        const my = normA.y + (normB.y - normA.y) * morphFactor;
+        const mw = normA.w + (normB.w - normA.w) * morphFactor;
+        const mh = normA.h + (normB.h - normA.h) * morphFactor;
+
+        const px = mx * CANVAS_WIDTH;
+        const py = my * CANVAS_HEIGHT;
+        const pw = mw * CANVAS_WIDTH;
+        const ph = mh * CANVAS_HEIGHT;
+
+        const cellConfig = morphFactor > 0.5 
+          ? (sceneB.cells[i] || sceneB.cells[0]) 
+          : (sceneA.cells[i] || sceneA.cells[0]);
+
+        const effProg = morphFactor > 0.5 ? progB : progA;
+
+        drawSingleCell(mainCtx, px, py, pw, ph, gap, cellConfig, effProg);
+      }
+    }
+
+    function startPlayback() {
+      if (state.isPlaying) return;
+      initWebAudio();
+      state.isPlaying = true;
+      state.lastTickTimestamp = performance.now();
+      playPauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+
+      if (state.audio.element && state.audio.element.src) {
+        state.audio.element.currentTime = state.currentTime;
+        state.audio.element.play().catch(() => {});
+      }
+
+      state.animationFrameId = requestAnimationFrame(playbackTick);
+    }
+
+    function pausePlayback() {
+      state.isPlaying = false;
+      playPauseBtn.innerHTML = '<i class="fa-solid fa-play ml-0.5"></i>';
+      if (state.animationFrameId) {
+        cancelAnimationFrame(state.animationFrameId);
+      }
+      if (state.audio.element) {
+        state.audio.element.pause();
+      }
+    }
+
+    function playbackTick(now) {
+      if (!state.isPlaying) return;
+
+      const dt = Math.min((now - state.lastTickTimestamp) / 1000, 0.066);
+      state.lastTickTimestamp = now;
+      state.currentTime += dt;
+
+      const totalDur = getTotalDuration();
+
+      if (state.currentTime >= totalDur) {
+        if (state.loop) {
+          state.currentTime = 0;
+          if (state.audio.element) state.audio.element.currentTime = 0;
+        } else {
+          state.currentTime = totalDur;
+          pausePlayback();
+          renderMainCanvas(state.currentTime);
+          syncTimelineUI();
+          return;
+        }
+      }
+
+      renderMainCanvas(state.currentTime);
+      syncTimelineUI();
+
+      state.animationFrameId = requestAnimationFrame(playbackTick);
+    }
+
+    function seekTimeline(t) {
+      state.currentTime = Math.min(Math.max(0, t), getTotalDuration());
+      if (state.audio.element && state.audio.element.src) {
+        state.audio.element.currentTime = state.currentTime;
+      }
+      renderMainCanvas(state.currentTime);
+      syncTimelineUI();
+    }
+
+    function syncTimelineUI() {
+      timelineScrubber.value = state.currentTime;
+      currentTimeLabel.textContent = formatTime(state.currentTime);
+      const total = getTotalDuration();
+      totalTimeLabel.textContent = formatTime(total);
+
+      const tState = getTimelineStateAtTime(state.currentTime);
+      if (tState && tState.activeSceneIndex !== undefined) {
+        if (tState.activeSceneIndex !== state.currentSceneIndex) {
+          state.currentSceneIndex = tState.activeSceneIndex;
+          renderScenesTabs();
+          updateSceneInspectorUI();
+        }
+        currentSceneBadge.textContent = `씬 ${tState.activeSceneIndex + 1} / ${state.scenes.length}`;
+      }
+    }
+
+    function refreshTimelineRange() {
+      const total = getTotalDuration();
+      timelineScrubber.max = total;
+      totalTimeLabel.textContent = formatTime(total);
+      currentTimeLabel.textContent = formatTime(state.currentTime);
+    }
+
+    function initWebAudio() {
+      if (!state.audioCtx) {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        state.audioCtx = new AudioCtxClass({ sampleRate: 48000 });
+        state.gainNode = state.audioCtx.createGain();
+        state.gainNode.gain.value = state.audio.volume;
+        state.gainNode.connect(state.audioCtx.destination);
+      }
+      if (state.audioCtx.state === 'suspended') {
+        state.audioCtx.resume().catch(() => {});
+      }
+    }
+
+    async function decodeAudioDataBuffer(arrayBuffer) {
+      initWebAudio();
+      try {
+        // Deep copy buffer before decoding because decodeAudioData detaches the buffer
+        const bufCopy = arrayBuffer.slice(0);
+        return await state.audioCtx.decodeAudioData(bufCopy);
+      } catch (e) {
+        console.warn('Audio decoding failed:', e);
+        return null;
+      }
+    }
+
+    async function applyAudioDataUrl(dataUrl, fileName) {
+      initWebAudio();
+      state.audio.dataUrl = dataUrl;
+      state.audio.name = fileName;
+
+      if (!state.audio.element) {
+        state.audio.element = new Audio();
+        const srcNode = state.audioCtx.createMediaElementSource(state.audio.element);
+        srcNode.connect(state.gainNode);
+      }
+
+      state.audio.element.src = dataUrl;
+      bgmLabel.textContent = fileName.length > 14 ? fileName.substring(0, 12) + '...' : fileName;
+      removeBgmBtn.classList.remove('hidden');
+
+      // Decode audio for WebCodecs AAC export pipeline
+      try {
+        const resp = await fetch(dataUrl);
+        const arrayBuf = await resp.arrayBuffer();
+        state.audio.audioBuffer = await decodeAudioDataBuffer(arrayBuf);
+        if (state.audio.audioBuffer) {
+          audioWaveStatus.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.warn('Failed to pre-decode audio for AAC encoder:', err);
+      }
+
+      dbSaveProjectState();
+    }
+
+    function removeBgm() {
+      if (state.audio.element) {
+        state.audio.element.pause();
+        state.audio.element.src = '';
+      }
+      state.audio.dataUrl = null;
+      state.audio.name = null;
+      state.audio.audioBuffer = null;
+      bgmLabel.textContent = '음악 파일 선택';
+      removeBgmBtn.classList.add('hidden');
+      audioWaveStatus.classList.add('hidden');
+      dbSaveProjectState();
+    }
+
+    function renderGallery() {
+      assetCountBadge.textContent = state.assets.length;
+      galleryContainer.innerHTML = '';
+
+      if (state.assets.length === 0) {
+        galleryContainer.innerHTML = `
+          <div class="h-36 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-xl text-center p-3 text-slate-500">
+            <i class="fa-regular fa-image text-2xl mb-1 text-slate-600"></i>
+            <span class="text-xs">사진 보관함이 비어있습니다.</span>
+          </div>
+        `;
+        return;
+      }
+
+      state.assets.forEach((asset, idx) => {
+        const card = document.createElement('div');
+        card.className = 'group flex items-center gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-indigo-500/50 transition';
+        card.innerHTML = `
+          <div class="w-11 h-11 rounded-lg bg-black overflow-hidden shrink-0 border border-slate-700">
+            <img src="${asset.dataUrl}" class="w-full h-full object-cover">
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-medium text-slate-200 truncate" title="${asset.name}">${asset.name}</p>
+            <span class="text-[9px] text-slate-400 font-mono">#${idx + 1}</span>
+          </div>
+          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+            <button class="p-1 text-slate-400 hover:text-rose-400 rounded delete-asset-btn" title="삭제">
+              <i class="fa-solid fa-trash-can text-xs"></i>
+            </button>
+          </div>
+        `;
+
+        card.querySelector('.delete-asset-btn').addEventListener('click', async (e) => {
+          e.stopPropagation();
+          state.assets.splice(idx, 1);
+          await dbDeleteAsset(asset.id);
+          renderGallery();
+          updateSceneInspectorUI();
+          renderMainCanvas(state.currentTime);
+          dbSaveProjectState();
+          showToast('사진이 보관함에서 삭제되었습니다.');
+        });
+
+        galleryContainer.appendChild(card);
+      });
+    }
+
+    function renderScenesTabs() {
+      scenesTabContainer.innerHTML = '';
+      totalScenesCountLabel.textContent = `${state.scenes.length}개 씬`;
+      const schedule = buildTimelineSchedule();
+
+      state.scenes.forEach((sc, idx) => {
+        const isActive = idx === state.currentSceneIndex;
+        const isFirst = idx === 0;
+        const isLast = idx === state.scenes.length - 1;
+
+        const tab = document.createElement('div');
+        tab.setAttribute('draggable', 'true');
+        tab.dataset.sceneIndex = idx;
+        tab.className = `group relative px-2.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 border select-none cursor-grab active:cursor-grabbing ${
+          isActive 
+            ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400/50' 
+            : 'bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700/80'
+        }`;
+
+        tab.innerHTML = `
+          <!-- Drag handle indicator -->
+          <i class="fa-solid fa-grip-vertical text-[10px] ${isActive ? 'text-indigo-200' : 'text-slate-500 group-hover:text-slate-300'} mr-0.5"></i>
+          
+          <!-- Scene Title & Duration -->
+          <span class="scene-title-label pointer-events-none">씬 ${idx + 1}</span>
+          <span class="text-[10px] opacity-75 font-mono pointer-events-none">${sc.duration}s</span>
+
+          <!-- Reorder Action Buttons (Left/Right) -->
+          <div class="flex items-center gap-0.5 ml-1 pl-1 border-l ${isActive ? 'border-indigo-400/60' : 'border-slate-700'}">
+            <button type="button" class="move-scene-prev p-1 rounded hover:bg-black/30 transition text-[9px] ${isFirst ? 'opacity-30 cursor-not-allowed' : 'hover:text-amber-300'}" title="앞으로 이동" ${isFirst ? 'disabled' : ''}>
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <button type="button" class="move-scene-next p-1 rounded hover:bg-black/30 transition text-[9px] ${isLast ? 'opacity-30 cursor-not-allowed' : 'hover:text-amber-300'}" title="뒤로 이동" ${isLast ? 'disabled' : ''}>
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+
+          <!-- Delete Button -->
+          ${state.scenes.length > 1 ? `
+            <button type="button" class="delete-scene-btn ml-0.5 p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 transition text-[10px]" title="씬 삭제">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          ` : ''}
+        `;
+
+        // Click on scene tab to select & seek
+        tab.addEventListener('click', (e) => {
+          if (e.target.closest('.move-scene-prev') || e.target.closest('.move-scene-next') || e.target.closest('.delete-scene-btn')) {
+            return;
+          }
+          state.currentSceneIndex = idx;
+          const targetItem = schedule[idx] || schedule[0];
+          seekTimeline(targetItem ? targetItem.globalStartTime : 0);
+          renderScenesTabs();
+          updateSceneInspectorUI();
+        });
+
+        // Move scene forward (Left / Earlier in timeline)
+        const prevBtn = tab.querySelector('.move-scene-prev');
+        if (prevBtn) {
+          prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (idx > 0) {
+              swapScenes(idx, idx - 1);
+            }
+          });
+        }
+
+        // Move scene backward (Right / Later in timeline)
+        const nextBtn = tab.querySelector('.move-scene-next');
+        if (nextBtn) {
+          nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (idx < state.scenes.length - 1) {
+              swapScenes(idx, idx + 1);
+            }
+          });
+        }
+
+        // Delete scene
+        const delBtn = tab.querySelector('.delete-scene-btn');
+        if (delBtn) {
+          delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            removeScene(idx);
+          });
+        }
+
+        // HTML5 Drag and Drop event bindings
+        tab.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(idx));
+          tab.classList.add('opacity-40', 'scale-95');
+        });
+
+        tab.addEventListener('dragend', () => {
+          tab.classList.remove('opacity-40', 'scale-95');
+          document.querySelectorAll('#scenesTabContainer > div').forEach(el => {
+            el.classList.remove('border-indigo-400', 'bg-indigo-500/20');
+          });
+        });
+
+        tab.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          tab.classList.add('border-indigo-400', 'bg-indigo-500/20');
+        });
+
+        tab.addEventListener('dragleave', () => {
+          tab.classList.remove('border-indigo-400', 'bg-indigo-500/20');
+        });
+
+        tab.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          tab.classList.remove('border-indigo-400', 'bg-indigo-500/20');
+          const sourceIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          const targetIdx = idx;
+          if (!isNaN(sourceIdx) && sourceIdx !== targetIdx) {
+            reorderScene(sourceIdx, targetIdx);
+          }
+        });
+
+        scenesTabContainer.appendChild(tab);
+      });
+    }
+
+    function swapScenes(fromIdx, toIdx) {
+      if (fromIdx < 0 || fromIdx >= state.scenes.length || toIdx < 0 || toIdx >= state.scenes.length) return;
+      const movedScene = state.scenes.splice(fromIdx, 1)[0];
+      state.scenes.splice(toIdx, 0, movedScene);
+
+      state.currentSceneIndex = toIdx;
+
+      refreshTimelineRange();
+      renderScenesTabs();
+      updateSceneInspectorUI();
+
+      const schedule = buildTimelineSchedule();
+      const currentItem = schedule[state.currentSceneIndex];
+      seekTimeline(currentItem ? currentItem.globalStartTime : 0);
+
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+      showToast(`씬 ${fromIdx + 1}이(가) 씬 ${toIdx + 1} 위치로 이동되었습니다.`);
+    }
+
+    function reorderScene(fromIdx, toIdx) {
+      if (fromIdx < 0 || fromIdx >= state.scenes.length || toIdx < 0 || toIdx >= state.scenes.length) return;
+      const [item] = state.scenes.splice(fromIdx, 1);
+      state.scenes.splice(toIdx, 0, item);
+
+      state.currentSceneIndex = toIdx;
+
+      refreshTimelineRange();
+      renderScenesTabs();
+      updateSceneInspectorUI();
+
+      const schedule = buildTimelineSchedule();
+      const currentItem = schedule[state.currentSceneIndex];
+      seekTimeline(currentItem ? currentItem.globalStartTime : 0);
+
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+      showToast(`씬 순서가 재배치되었습니다 (씬 ${fromIdx + 1} ➔ 씬 ${toIdx + 1}).`);
+    }
+
+    function renderLayoutPresetsButtons() {
+      layoutButtonsContainer.innerHTML = '';
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (!curScene) return;
+
+      LAYOUT_PRESETS.forEach(preset => {
+        const isSel = curScene.layoutId === preset.id;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.title = preset.name;
+        btn.className = `h-11 rounded-lg p-1.5 border transition flex items-center justify-center ${
+          isSel 
+            ? 'bg-indigo-600/20 border-indigo-500 shadow-sm ring-1 ring-indigo-500' 
+            : 'bg-slate-800/80 border-slate-700/80 hover:border-slate-500 hover:bg-slate-800'
+        }`;
+        btn.innerHTML = preset.icon;
+        btn.addEventListener('click', () => changeSceneLayout(preset.id));
+        layoutButtonsContainer.appendChild(btn);
+      });
+    }
+
+    function changeSceneLayout(newLayoutId) {
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (!curScene) return;
+
+      curScene.layoutId = newLayoutId;
+      const preset = LAYOUT_PRESETS.find(p => p.id === newLayoutId);
+      activeLayoutName.textContent = preset ? preset.name : '';
+
+      const reqCount = preset.cells.length;
+      while (curScene.cells.length < reqCount) {
+        const cIdx = curScene.cells.length;
+        curScene.cells.push(createDefaultCellConfig(state.assets[cIdx % (state.assets.length || 1)]?.id));
+      }
+      if (curScene.cells.length > reqCount) {
+        curScene.cells = curScene.cells.slice(0, reqCount);
+      }
+
+      renderLayoutPresetsButtons();
+      updateSceneInspectorUI();
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+      showToast(`${preset.name} 레이아웃으로 변경되었습니다.`);
+    }
+
+    function updateSceneInspectorUI() {
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (!curScene) return;
+
+      sceneDurationInput.value = curScene.duration;
+      sceneTransitionSelect.value = curScene.transition || 'cell-push';
+      transDurationSlider.value = curScene.transitionDuration !== undefined ? curScene.transitionDuration : 0.7;
+      transDurVal.textContent = `${transDurationSlider.value}s`;
+      transEasingSelect.value = curScene.transitionEasing || DEFAULT_EASING;
+
+      const preset = LAYOUT_PRESETS.find(p => p.id === curScene.layoutId) || LAYOUT_PRESETS[1];
+      activeLayoutName.textContent = preset.name;
+      renderLayoutPresetsButtons();
+
+      cellsInspectorList.innerHTML = '';
+
+      preset.cells.forEach((normRect, idx) => {
+        const cellData = curScene.cells[idx] || createDefaultCellConfig(state.assets[0]?.id);
+
+        if (cellData.startPoint === undefined) cellData.startPoint = 0;
+        if (cellData.endPoint === undefined) cellData.endPoint = 100;
+        if (cellData.motion === undefined) cellData.motion = DEFAULT_MOTION;
+        if (cellData.easing === undefined) cellData.easing = DEFAULT_EASING;
+        if (cellData.zoomFactor === undefined) cellData.zoomFactor = DEFAULT_ZOOM_FACTOR;
+
+        const itemBox = document.createElement('div');
+        itemBox.className = 'p-3 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-2.5';
+
+        let assetOptions = state.assets.length > 0 
+          ? state.assets.map(a => `<option value="${a.id}" ${a.id === cellData.assetId ? 'selected' : ''}>${a.name}</option>`).join('')
+          : '<option value="">등록된 사진 없음</option>';
+
+        itemBox.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-700/50 pb-2">
+            <span class="text-[11px] font-bold text-indigo-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-vector-square"></i> 분할 슬롯 #${idx + 1}
+            </span>
+            <span class="text-[10px] text-slate-400 font-mono">${Math.round(normRect.w * 100)}% × ${Math.round(normRect.h * 100)}%</span>
+          </div>
+
+          <div class="space-y-2">
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">배정할 사진</label>
+              <select class="asset-selector bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white w-full outline-none">
+                ${assetOptions}
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">패닝 / 모션 방식</label>
+                <select class="motion-selector bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white w-full outline-none">
+                  <option value="zoom-out" ${cellData.motion === 'zoom-out' ? 'selected' : ''}>중심 줌아웃 (Center Zoom Out)</option>
+                  <option value="zoom-in" ${cellData.motion === 'zoom-in' ? 'selected' : ''}>중심 줌인 (Center Zoom In)</option>
+                  <option value="slide-lr" ${cellData.motion === 'slide-lr' ? 'selected' : ''}>좌 → 우 (Left to Right)</option>
+                  <option value="slide-rl" ${cellData.motion === 'slide-rl' ? 'selected' : ''}>우 → 좌 (Right to Left)</option>
+                  <option value="slide-tb" ${cellData.motion === 'slide-tb' ? 'selected' : ''}>위 → 아래 (Top to Down)</option>
+                  <option value="slide-bt" ${cellData.motion === 'slide-bt' ? 'selected' : ''}>아래 → 위 (Down to Top)</option>
+                  <option value="diagonal" ${cellData.motion === 'diagonal' ? 'selected' : ''}>대각선 패닝</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-[10px] text-slate-400 block mb-1">이징 (속도곡선)</label>
+                <select class="easing-selector bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white w-full outline-none">
+                  <option value="smoothstep" ${cellData.easing === 'smoothstep' ? 'selected' : ''}>Smoothstep (기본 / 부드러움)</option>
+                  <option value="easeInOutCubic" ${cellData.easing === 'easeInOutCubic' ? 'selected' : ''}>Ease In Out Cubic</option>
+                  <option value="easeInOutQuad" ${cellData.easing === 'easeInOutQuad' ? 'selected' : ''}>Ease In Out Quad</option>
+                  <option value="easeOutQuad" ${cellData.easing === 'easeOutQuad' ? 'selected' : ''}>Ease Out Quad</option>
+                  <option value="linear" ${cellData.easing === 'linear' ? 'selected' : ''}>Linear (등속)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Start and End Points Sliders -->
+            <div class="p-2.5 rounded-lg bg-slate-900/80 border border-slate-700/60 space-y-2">
+              <div class="flex items-center justify-between text-[10px] font-semibold text-slate-300">
+                <span class="flex items-center gap-1">
+                  <i class="fa-solid fa-arrows-left-right-to-line text-indigo-400"></i> 이동/패닝 범위 조절
+                </span>
+                <span class="text-indigo-400 font-mono range-display-label">${cellData.startPoint}% → ${cellData.endPoint}%</span>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-400">
+                <div>
+                  <div class="flex justify-between mb-0.5">
+                    <span>시작 지점</span>
+                    <span class="font-mono start-val-label">${cellData.startPoint}%</span>
+                  </div>
+                  <input type="range" min="0" max="100" step="5" value="${cellData.startPoint}" class="start-range w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+                </div>
+                <div>
+                  <div class="flex justify-between mb-0.5">
+                    <span>종료 지점</span>
+                    <span class="font-mono end-val-label">${cellData.endPoint}%</span>
+                  </div>
+                  <input type="range" min="0" max="100" step="5" value="${cellData.endPoint}" class="end-range w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+                </div>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="flex items-center gap-1 pt-1 overflow-x-auto">
+                <button type="button" class="preset-btn px-1.5 py-0.5 text-[9px] rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700" data-s="0" data-e="100">전체 0→100%</button>
+                <button type="button" class="preset-btn px-1.5 py-0.5 text-[9px] rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700" data-s="0" data-e="50">좌→중간 0→50%</button>
+                <button type="button" class="preset-btn px-1.5 py-0.5 text-[9px] rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700" data-s="50" data-e="100">중간→우 50→100%</button>
+                <button type="button" class="preset-btn px-1.5 py-0.5 text-[9px] rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700" data-s="30" data-e="70">은은 30→70%</button>
+              </div>
+            </div>
+
+            <div class="pt-0.5">
+              <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                <span>모션 스케일 (초기 줌 배율)</span>
+                <span class="zoom-val-label font-mono">${(cellData.zoomFactor || DEFAULT_ZOOM_FACTOR).toFixed(2)}x</span>
+              </div>
+              <input type="range" min="1.0" max="2.0" step="0.05" value="${cellData.zoomFactor || DEFAULT_ZOOM_FACTOR}" class="zoom-range w-full h-1.5 bg-slate-900 rounded-lg cursor-pointer">
+            </div>
+          </div>
+        `;
+
+        itemBox.querySelector('.asset-selector').addEventListener('change', (e) => {
+          cellData.assetId = e.target.value;
+          renderMainCanvas(state.currentTime);
+          dbSaveProjectState();
+        });
+
+        itemBox.querySelector('.motion-selector').addEventListener('change', (e) => {
+          cellData.motion = e.target.value;
+          renderMainCanvas(state.currentTime);
+          dbSaveProjectState();
+        });
+
+        itemBox.querySelector('.easing-selector').addEventListener('change', (e) => {
+          cellData.easing = e.target.value;
+          renderMainCanvas(state.currentTime);
+          dbSaveProjectState();
+        });
+
+        const startSlider = itemBox.querySelector('.start-range');
+        const endSlider = itemBox.querySelector('.end-range');
+        const startLabel = itemBox.querySelector('.start-val-label');
+        const endLabel = itemBox.querySelector('.end-val-label');
+        const rangeDisplay = itemBox.querySelector('.range-display-label');
+
+        function updateRangeLabels() {
+          startLabel.textContent = `${cellData.startPoint}%`;
+          endLabel.textContent = `${cellData.endPoint}%`;
+          rangeDisplay.textContent = `${cellData.startPoint}% → ${cellData.endPoint}%`;
+        }
+
+        startSlider.addEventListener('input', (e) => {
+          cellData.startPoint = parseInt(e.target.value, 10);
+          updateRangeLabels();
+          renderMainCanvas(state.currentTime);
+          dbSaveProjectState();
+        });
+
+        endSlider.addEventListener('input', (e) => {
+          cellData.endPoint = parseInt(e.target.value, 10);
+          updateRangeLabels();
+          renderMainCanvas(state.currentTime);
+          dbSaveProjectState();
+        });
+
+        itemBox.querySelectorAll('.preset-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const s = parseInt(btn.dataset.s, 10);
+            const e = parseInt(btn.dataset.e, 10);
+            cellData.startPoint = s;
+            cellData.endPoint = e;
+            startSlider.value = s;
+            endSlider.value = e;
+            updateRangeLabels();
+            renderMainCanvas(state.currentTime);
+            dbSaveProjectState();
+          });
+        });
+
+        const zRange = itemBox.querySelector('.zoom-range');
+        const zLabel = itemBox.querySelector('.zoom-val-label');
+        zRange.addEventListener('input', (e) => {
+          cellData.zoomFactor = parseFloat(e.target.value);
+          zLabel.textContent = `${cellData.zoomFactor.toFixed(2)}x`;
+          renderMainCanvas(state.currentTime);
+          dbSaveProjectState();
+        });
+
+        cellsInspectorList.appendChild(itemBox);
+      });
+    }
+
+    function removeScene(idx) {
+      if (state.scenes.length <= 1) return;
+      state.scenes.splice(idx, 1);
+      if (state.currentSceneIndex >= state.scenes.length) {
+        state.currentSceneIndex = state.scenes.length - 1;
+      }
+      refreshTimelineRange();
+      renderScenesTabs();
+      updateSceneInspectorUI();
+      seekTimeline(0);
+      dbSaveProjectState();
+      showToast('씬이 삭제되었습니다.');
+    }
+
+    async function exportProjectToFile() {
+      try {
+        const projectPackage = {
+          version: '7.0',
+          appName: 'ShortsCollageStudioPro',
+          timestamp: new Date().toISOString(),
+          assets: state.assets.map(a => ({
+            id: a.id,
+            name: a.name,
+            dataUrl: a.dataUrl,
+            width: a.width,
+            height: a.height
+          })),
+          scenes: state.scenes,
+          cellGap: state.cellGap,
+          exportFormat: state.exportFormat,
+          seamlessLoopMode: state.seamlessLoopMode,
+          audio: state.audio.dataUrl ? {
+            name: state.audio.name,
+            dataUrl: state.audio.dataUrl,
+            volume: state.audio.volume
+          } : null
+        };
+
+        const jsonStr = JSON.stringify(projectPackage);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const dlUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = dlUrl;
+        a.download = `Shorts_Project_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(dlUrl);
+
+        showToast('프로젝트 파일(.json) 저장이 완료되었습니다.');
+      } catch (err) {
+        console.error('Export Project Failed:', err);
+        showToast('프로젝트 저장 실패', 'error');
+      }
+    }
+
+    async function importProjectFromFile(file) {
+      try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (!data.assets || !data.scenes) {
+              throw new Error('유효하지 않은 프로젝트 파일 형식입니다.');
+            }
+
+            pausePlayback();
+            await dbClearAll();
+
+            state.assets = [];
+            for (const assetData of data.assets) {
+              const imgElem = await loadImageElement(assetData.dataUrl);
+              const assetObj = {
+                id: assetData.id,
+                name: assetData.name,
+                dataUrl: assetData.dataUrl,
+                width: assetData.width || imgElem.width,
+                height: assetData.height || imgElem.height,
+                imgElement: imgElem
+              };
+              state.assets.push(assetObj);
+              await dbSaveAsset(assetObj);
+            }
+
+            state.scenes = data.scenes;
+            state.cellGap = data.cellGap !== undefined ? data.cellGap : 6;
+            if (data.exportFormat) setExportFormat(data.exportFormat);
+            if (data.seamlessLoopMode !== undefined) {
+              state.seamlessLoopMode = data.seamlessLoopMode;
+              loopModeStatusLabel.textContent = state.seamlessLoopMode ? 'ON' : 'OFF';
+              loopModeStatusLabel.className = state.seamlessLoopMode ? 'text-emerald-400 font-bold' : 'text-slate-400 font-bold';
+            }
+            state.currentSceneIndex = 0;
+            state.currentTime = 0;
+
+            if (data.audio && data.audio.dataUrl) {
+              applyAudioDataUrl(data.audio.dataUrl, data.audio.name);
+              if (data.audio.volume !== undefined) {
+                state.audio.volume = data.audio.volume;
+                bgmVolumeSlider.value = state.audio.volume;
+                bgmVolumeVal.textContent = `${Math.round(state.audio.volume * 100)}%`;
+              }
+            } else {
+              removeBgm();
+            }
+
+            cellGapSlider.value = state.cellGap;
+            cellGapVal.textContent = `${state.cellGap}px`;
+
+            renderGallery();
+            renderScenesTabs();
+            updateSceneInspectorUI();
+            refreshTimelineRange();
+            renderMainCanvas(0);
+            await dbSaveProjectState();
+
+            showToast('프로젝트를 성공적으로 불러왔습니다!');
+          } catch (err) {
+            console.error('Parse Project Failed:', err);
+            showToast('프로젝트 파일 파싱 실패: ' + err.message, 'error');
+          }
+        };
+        reader.readAsText(file);
+      } catch (err) {
+        showToast('파일 읽기 실패', 'error');
+      }
+    }
+
+    function setExportFormat(fmt) {
+      state.exportFormat = fmt;
+      if (fmt === 'mp4') {
+        formatMp4Btn.className = 'px-2 py-1 text-[11px] font-bold rounded-md bg-indigo-600 text-white transition shadow-sm';
+        formatWebmBtn.className = 'px-2 py-1 text-[11px] font-semibold rounded-md text-slate-400 hover:text-white transition';
+        exportBtnLabel.textContent = 'MP4 (AAC) 쇼츠 렌더링';
+        exportModalTitle.textContent = 'H.264 + AAC MP4 60FPS 하드웨어 인코딩 중';
+      } else {
+        formatWebmBtn.className = 'px-2 py-1 text-[11px] font-bold rounded-md bg-indigo-600 text-white transition shadow-sm';
+        formatMp4Btn.className = 'px-2 py-1 text-[11px] font-semibold rounded-md text-slate-400 hover:text-white transition';
+        exportBtnLabel.textContent = 'WebM 쇼츠 렌더링';
+        exportModalTitle.textContent = 'WebM 60FPS 무손실 렌더링 중';
+      }
+      dbSaveProjectState();
+    }
+
+    formatMp4Btn.addEventListener('click', () => setExportFormat('mp4'));
+    formatWebmBtn.addEventListener('click', () => setExportFormat('webm'));
+
+    async function startVideoExport() {
+      if (state.isExporting) return;
+      pausePlayback();
+      initWebAudio();
+
+      if (state.exportFormat === 'mp4') {
+        if (window.VideoEncoder && window.Mp4Muxer) {
+          return startMp4WebCodecsExport();
+        } else if (MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
+          return startMediaRecorderExport('video/mp4; codecs="avc1.42E01E"', 'mp4');
+        } else {
+          showToast('브라우저에서 WebCodecs MP4를 지원하지 않아 WebM으로 내보냅니다.', 'info');
+          return startMediaRecorderExport('video/webm;codecs=vp9', 'webm');
+        }
+      } else {
+        let mime = 'video/webm;codecs=vp9';
+        if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
+        return startMediaRecorderExport(mime, 'webm');
+      }
+    }
+
+    /**
+     * Slices and prepares interleaved Float32 planar PCM samples from state.audio.audioBuffer
+     * synchronized with recording start, total duration and loop phase offset.
+     */
+    function extractSynchronizedPcmAudio(totalDurationSec, phaseOffsetSec, targetSampleRate = 48000) {
+      if (!state.audio.audioBuffer) return null;
+
+      const srcBuf = state.audio.audioBuffer;
+      const srcSampleRate = srcBuf.sampleRate;
+      const numChannels = Math.min(2, srcBuf.numberOfChannels);
+      const totalOutSamples = Math.ceil(totalDurationSec * targetSampleRate);
+
+      // Create planar Float32 arrays for stereo
+      const channelDataL = new Float32Array(totalOutSamples);
+      const channelDataR = new Float32Array(totalOutSamples);
+
+      const srcL = srcBuf.getChannelData(0);
+      const srcR = numChannels > 1 ? srcBuf.getChannelData(1) : srcL;
+      const srcTotalSamples = srcBuf.length;
+      const vol = state.audio.volume;
+
+      const startSampleOffset = Math.round(phaseOffsetSec * srcSampleRate);
+
+      for (let i = 0; i < totalOutSamples; i++) {
+        const timeSec = (i / targetSampleRate);
+        const srcIndex = (startSampleOffset + Math.round(timeSec * srcSampleRate)) % srcTotalSamples;
+
+        channelDataL[i] = srcL[srcIndex] * vol;
+        channelDataR[i] = srcR[srcIndex] * vol;
+      }
+
+      return {
+        sampleRate: targetSampleRate,
+        numberOfChannels: 2,
+        length: totalOutSamples,
+        left: channelDataL,
+        right: channelDataR
+      };
+    }
+
+    async function startMp4WebCodecsExport() {
+      state.isExporting = true;
+      exportModal.classList.remove('hidden');
+      exportProgressBar.style.width = '0%';
+      exportProgressPct.textContent = '0%';
+
+      const totalDur = getTotalDuration();
+      const exportFps = 60;
+      const totalFrames = Math.ceil(totalDur * exportFps);
+      const stepDt = 1 / exportFps;
+
+      let phaseOffset = 0;
+      if (state.seamlessLoopMode && state.scenes.length > 1) {
+        const schedule = buildTimelineSchedule();
+        const lastItem = schedule[schedule.length - 1];
+        if (lastItem.transDuration > 0) {
+          phaseOffset = lastItem.transStartTime + (lastItem.transDuration / 2);
+        }
+        exportLoopIndicator.classList.remove('hidden');
+      } else {
+        exportLoopIndicator.classList.add('hidden');
+      }
+
+      const hasAudio = !!(state.audio.audioBuffer && window.AudioEncoder);
+      if (hasAudio) {
+        exportAudioIndicator.classList.remove('hidden');
+      } else {
+        exportAudioIndicator.classList.add('hidden');
+      }
+
+      try {
+        // Initialize mp4-muxer with video and optional AAC audio configuration
+        const muxerOptions = {
+          target: new Mp4Muxer.ArrayBufferTarget(),
+          video: {
+            codec: 'avc',
+            width: CANVAS_WIDTH,
+            height: CANVAS_HEIGHT
+          },
+          fastStart: 'in-memory'
+        };
+
+        if (hasAudio) {
+          muxerOptions.audio = {
+            codec: 'aac',
+            sampleRate: 48000,
+            numberOfChannels: 2
+          };
+        }
+
+        const muxer = new Mp4Muxer.Muxer(muxerOptions);
+
+        // Configure Video Encoder
+        const videoEncoder = new VideoEncoder({
+          output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+          error: (e) => {
+            console.error('VideoEncoder error:', e);
+            cancelExport();
+            showToast('H.264 인코더 오류: ' + e.message, 'error');
+          }
+        });
+
+        await videoEncoder.configure({
+          codec: 'avc1.420033', // H.264 Baseline Profile Level 5.1
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+          bitrate: 16_000_000, // 16 Mbps
+          framerate: exportFps,
+          hardwareAcceleration: 'prefer-hardware'
+        });
+
+        // Configure Audio Encoder (AAC) if BGM is present
+        let audioEngine = null;
+        if (hasAudio) {
+          const audioEncoder = new AudioEncoder({
+            output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+            error: (e) => {
+              console.warn('AudioEncoder warning:', e);
+            }
+          });
+
+          await audioEncoder.configure({
+            codec: 'mp4a.40.2', // AAC Low Complexity
+            sampleRate: 48000,
+            numberOfChannels: 2,
+            bitrate: 192_000 // 192 kbps studio quality
+          });
+
+          audioEngine = {
+            encoder: audioEncoder,
+            pcm: extractSynchronizedPcmAudio(totalDur, phaseOffset, 48000)
+          };
+        }
+
+        // Render video frames and encode corresponding audio chunks
+        for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+          if (!state.isExporting) {
+            videoEncoder.close();
+            if (audioEngine) audioEngine.encoder.close();
+            return;
+          }
+
+          const simT = (frameIndex * stepDt) + phaseOffset;
+          renderMainCanvas(simT);
+
+          const timestampMicros = Math.round(frameIndex * (1_000_000 / exportFps));
+          const keyFrame = (frameIndex % (exportFps * 2) === 0);
+
+          const videoFrame = new VideoFrame(mainCanvas, {
+            timestamp: timestampMicros,
+            duration: Math.round(1_000_000 / exportFps)
+          });
+
+          videoEncoder.encode(videoFrame, { keyFrame });
+          videoFrame.close();
+
+          // Encode slice of AAC audio matching this frame interval
+          if (audioEngine && audioEngine.pcm) {
+            const sampleRate = audioEngine.pcm.sampleRate;
+            const startSample = Math.round(frameIndex * stepDt * sampleRate);
+            const endSample = Math.min(Math.round((frameIndex + 1) * stepDt * sampleRate), audioEngine.pcm.length);
+            const numSliceSamples = endSample - startSample;
+
+            if (numSliceSamples > 0) {
+              const planarBuffer = new Float32Array(numSliceSamples * 2);
+              const leftSlice = audioEngine.pcm.left.subarray(startSample, endSample);
+              const rightSlice = audioEngine.pcm.right.subarray(startSample, endSample);
+
+              planarBuffer.set(leftSlice, 0);
+              planarBuffer.set(rightSlice, numSliceSamples);
+
+              const audioData = new AudioData({
+                format: 'f32-planar',
+                sampleRate: 48000,
+                numberOfFrames: numSliceSamples,
+                numberOfChannels: 2,
+                timestamp: timestampMicros,
+                data: planarBuffer
+              });
+
+              audioEngine.encoder.encode(audioData);
+              audioData.close();
+            }
+          }
+
+          const pct = Math.min(100, Math.round(((frameIndex + 1) / totalFrames) * 100));
+          exportProgressBar.style.width = `${pct}%`;
+          exportProgressPct.textContent = `${pct}%`;
+          exportProgressTime.textContent = `${(((frameIndex + 1) * stepDt)).toFixed(1)}s / ${totalDur.toFixed(1)}s`;
+
+          if (frameIndex % 3 === 0) {
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+
+        // Finalize encoders
+        await videoEncoder.flush();
+        videoEncoder.close();
+
+        if (audioEngine) {
+          await audioEngine.encoder.flush();
+          audioEngine.encoder.close();
+        }
+
+        muxer.finalize();
+
+        const buffer = muxer.target.buffer;
+        const blob = new Blob([buffer], { type: 'video/mp4' });
+        const dlUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = dlUrl;
+        const loopTag = state.seamlessLoopMode ? '_SeamlessLoop' : '';
+        const soundTag = hasAudio ? '_withBGM' : '';
+        a.download = `Shorts_Pro${loopTag}${soundTag}_${new Date().toISOString().slice(0, 10)}_${Date.now()}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        exportModal.classList.add('hidden');
+        state.isExporting = false;
+        showToast(hasAudio 
+          ? 'H.264 비디오 + AAC 배경음악이 결합된 고화질 MP4 쇼츠가 저장되었습니다!' 
+          : 'H.264 MP4 쇼츠 비디오 저장이 완료되었습니다!');
+
+      } catch (err) {
+        console.error('MP4 WebCodecs Export Error:', err);
+        cancelExport();
+        showToast('MP4 내보내기 실패: ' + err.message, 'error');
+      }
+    }
+
+    async function startMediaRecorderExport(mimeType, ext) {
+      state.isExporting = true;
+      exportModal.classList.remove('hidden');
+      exportProgressBar.style.width = '0%';
+      exportProgressPct.textContent = '0%';
+
+      if (state.seamlessLoopMode && state.scenes.length > 1) {
+        exportLoopIndicator.classList.remove('hidden');
+      } else {
+        exportLoopIndicator.classList.add('hidden');
+      }
+
+      const totalDur = getTotalDuration();
+      const exportFps = 60;
+      const totalFrames = Math.ceil(totalDur * exportFps);
+      let frameIndex = 0;
+
+      let phaseOffset = 0;
+      if (state.seamlessLoopMode && state.scenes.length > 1) {
+        const schedule = buildTimelineSchedule();
+        const lastItem = schedule[schedule.length - 1];
+        if (lastItem.transDuration > 0) {
+          phaseOffset = lastItem.transStartTime + (lastItem.transDuration / 2);
+        }
+      }
+
+      const canvasStream = mainCanvas.captureStream(exportFps);
+      let finalStream = canvasStream;
+
+      if (state.audio.element && state.audio.element.src) {
+        try {
+          const dest = state.audioCtx.createMediaStreamDestination();
+          state.gainNode.connect(dest);
+          const aTrack = dest.stream.getAudioTracks()[0];
+          if (aTrack) {
+            finalStream = new MediaStream([
+              canvasStream.getVideoTracks()[0],
+              aTrack
+            ]);
+            exportAudioIndicator.classList.remove('hidden');
+          }
+        } catch (e) {
+          console.warn('Audio combine warning:', e);
+        }
+      } else {
+        exportAudioIndicator.classList.add('hidden');
+      }
+
+      const recordedChunks = [];
+      const recorder = new MediaRecorder(finalStream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: 16000000
+      });
+      state.recorder = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        if (!state.isExporting) return;
+        const blob = new Blob(recordedChunks, { type: mimeType });
+        const dlUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = dlUrl;
+        const loopTag = state.seamlessLoopMode ? '_SeamlessLoop' : '';
+        const soundTag = state.audio.element && state.audio.element.src ? '_withBGM' : '';
+        a.download = `Shorts_Pro${loopTag}${soundTag}_${new Date().toISOString().slice(0, 10)}_${Date.now()}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        exportModal.classList.add('hidden');
+        state.isExporting = false;
+        showToast(`60FPS 쇼츠 비디오(.${ext}) 저장이 완료되었습니다!`);
+      };
+
+      recorder.start();
+
+      if (state.audio.element && state.audio.element.src) {
+        state.audio.element.currentTime = phaseOffset;
+        state.audio.element.play().catch(() => {});
+      }
+
+      const stepDt = 1 / exportFps;
+      const frameInterval = setInterval(() => {
+        if (!state.isExporting) {
+          clearInterval(frameInterval);
+          return;
+        }
+
+        const simT = (frameIndex * stepDt) + phaseOffset;
+        renderMainCanvas(simT);
+
+        frameIndex++;
+        const pct = Math.min(100, Math.round((frameIndex / totalFrames) * 100));
+        exportProgressBar.style.width = `${pct}%`;
+        exportProgressPct.textContent = `${pct}%`;
+        exportProgressTime.textContent = `${((frameIndex * stepDt)).toFixed(1)}s / ${totalDur.toFixed(1)}s`;
+
+        if (frameIndex >= totalFrames) {
+          clearInterval(frameInterval);
+          if (state.audio.element) state.audio.element.pause();
+          setTimeout(() => {
+            recorder.stop();
+          }, 350);
+        }
+      }, 1000 / exportFps);
+    }
+
+    function cancelExport() {
+      if (!state.isExporting) return;
+      state.isExporting = false;
+      if (state.recorder && state.recorder.state !== 'inactive') {
+        state.recorder.stop();
+      }
+      if (state.audio.element) state.audio.element.pause();
+      exportModal.classList.add('hidden');
+      showToast('내보내기가 취소되었습니다.', 'error');
+    }
+
+    function showToast(msg, type = 'success') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.textContent = msg;
+      if (type === 'error') {
+        toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400';
+      } else if (type === 'info') {
+        toastIcon.className = 'fa-solid fa-circle-info text-sky-400';
+      } else {
+        toastIcon.className = 'fa-solid fa-circle-check text-indigo-400';
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+
+    async function initApp() {
+      const storedAssets = await dbGetAllAssets();
+      if (storedAssets && storedAssets.length > 0) {
+        for (const item of storedAssets) {
+          try {
+            const imgElem = await loadImageElement(item.dataUrl);
+            state.assets.push({
+              id: item.id,
+              name: item.name,
+              dataUrl: item.dataUrl,
+              width: item.width || imgElem.width,
+              height: item.height || imgElem.height,
+              imgElement: imgElem
+            });
+          } catch (e) {
+            console.warn('Failed to load cached asset:', item.name);
+          }
+        }
+      } else {
+        const defaultSamples = [
+          { id: 'sample-1', name: '자연 풍경 (Alpine)', src: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&q=80' },
+          { id: 'sample-2', name: '도시 야경 (Tokyo)', src: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1600&q=80' },
+          { id: 'sample-3', name: '에메랄드 해변', src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80' },
+          { id: 'sample-4', name: '설산 일출 파노라마', src: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1600&q=80' }
+        ];
+
+        for (const s of defaultSamples) {
+          try {
+            const resp = await fetch(s.src);
+            const blob = await resp.blob();
+            const dataUrl = await readFileAsDataURL(blob);
+            const imgElem = await loadImageElement(dataUrl);
+            const aObj = { id: s.id, name: s.name, dataUrl, width: imgElem.width, height: imgElem.height, imgElement: imgElem };
+            state.assets.push(aObj);
+            await dbSaveAsset(aObj);
+          } catch (e) {
+            console.warn('Sample load fallback warning:', e);
+          }
+        }
+      }
+
+      const savedProj = await dbLoadProjectState();
+
+      if (savedProj.scenesConfig && savedProj.scenesConfig.scenes && savedProj.scenesConfig.scenes.length > 0) {
+        state.scenes = savedProj.scenesConfig.scenes;
+        state.currentSceneIndex = savedProj.scenesConfig.currentSceneIndex || 0;
+        state.cellGap = savedProj.scenesConfig.cellGap !== undefined ? savedProj.scenesConfig.cellGap : 6;
+        if (savedProj.scenesConfig.seamlessLoopMode !== undefined) {
+          state.seamlessLoopMode = savedProj.scenesConfig.seamlessLoopMode;
+        }
+        if (savedProj.scenesConfig.exportFormat) {
+          setExportFormat(savedProj.scenesConfig.exportFormat);
+        } else {
+          setExportFormat('mp4');
+        }
+      } else {
+        state.scenes.push({
+          id: 'scene-1',
+          layoutId: 'split-2v',
+          duration: 4.0,
+          transition: 'cell-push',
+          transitionDuration: 0.7,
+          transitionEasing: DEFAULT_EASING,
+          cells: [
+            createDefaultCellConfig(state.assets[0]?.id),
+            createDefaultCellConfig(state.assets[1]?.id)
+          ]
+        });
+
+        state.scenes.push({
+          id: 'scene-2',
+          layoutId: 'split-3v',
+          duration: 4.0,
+          transition: 'cell-stagger',
+          transitionDuration: 0.7,
+          transitionEasing: DEFAULT_EASING,
+          cells: [
+            createDefaultCellConfig(state.assets[2]?.id),
+            createDefaultCellConfig(state.assets[3]?.id),
+            createDefaultCellConfig(state.assets[0]?.id)
+          ]
+        });
+        setExportFormat('mp4');
+      }
+
+      loopModeStatusLabel.textContent = state.seamlessLoopMode ? 'ON' : 'OFF';
+      loopModeStatusLabel.className = state.seamlessLoopMode ? 'text-emerald-400 font-bold' : 'text-slate-400 font-bold';
+
+      if (savedProj.audioTrack && savedProj.audioTrack.dataUrl) {
+        applyAudioDataUrl(savedProj.audioTrack.dataUrl, savedProj.audioTrack.name);
+        if (savedProj.audioTrack.volume !== undefined) {
+          state.audio.volume = savedProj.audioTrack.volume;
+          bgmVolumeSlider.value = state.audio.volume;
+          bgmVolumeVal.textContent = `${Math.round(state.audio.volume * 100)}%`;
+        }
+      }
+
+      cellGapSlider.value = state.cellGap;
+      cellGapVal.textContent = `${state.cellGap}px`;
+
+      renderGallery();
+      renderScenesTabs();
+      updateSceneInspectorUI();
+      refreshTimelineRange();
+      renderMainCanvas(0);
+    }
+
+    toggleLoopModeBtn.addEventListener('click', () => {
+      state.seamlessLoopMode = !state.seamlessLoopMode;
+      loopModeStatusLabel.textContent = state.seamlessLoopMode ? 'ON' : 'OFF';
+      loopModeStatusLabel.className = state.seamlessLoopMode ? 'text-emerald-400 font-bold' : 'text-slate-400 font-bold';
+      refreshTimelineRange();
+      renderScenesTabs();
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+      showToast(state.seamlessLoopMode ? '무한 루프 모드가 활성화되었습니다 (Scene N ➔ Scene 1 연결).' : '일반 단방향 재생 모드로 변경되었습니다.');
+    });
+
+    triggerUploadBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      multiImageInput.value = '';
+      multiImageInput.click();
+    });
+
+    multiImageInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFiles(e.target.files);
+      }
+    });
+
+    dropZone.addEventListener('click', (e) => {
+      e.preventDefault();
+      multiImageInput.value = '';
+      multiImageInput.click();
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-indigo-500', 'bg-indigo-500/10');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/10');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-indigo-500', 'bg-indigo-500/10');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    quickDistributeBtn.addEventListener('click', () => {
+      if (state.assets.length === 0) return;
+      let assetIdx = 0;
+      state.scenes.forEach(scene => {
+        scene.cells.forEach(cell => {
+          cell.assetId = state.assets[assetIdx % state.assets.length].id;
+          assetIdx++;
+        });
+      });
+      updateSceneInspectorUI();
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+      showToast('모든 씬의 슬롯에 사진이 골고루 분배되었습니다.');
+    });
+
+    bgmInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const dataUrl = await readFileAsDataURL(file);
+        applyAudioDataUrl(dataUrl, file.name);
+      }
+      e.target.value = '';
+    });
+    removeBgmBtn.addEventListener('click', removeBgm);
+
+    bgmVolumeSlider.addEventListener('input', (e) => {
+      state.audio.volume = parseFloat(e.target.value);
+      bgmVolumeVal.textContent = `${Math.round(state.audio.volume * 100)}%`;
+      if (state.gainNode) {
+        state.gainNode.gain.value = state.audio.volume;
+      }
+      dbSaveProjectState();
+    });
+
+    playPauseBtn.addEventListener('click', () => {
+      if (state.isPlaying) pausePlayback();
+      else startPlayback();
+    });
+
+    timelineScrubber.addEventListener('input', (e) => {
+      const wasPlaying = state.isPlaying;
+      pausePlayback();
+      seekTimeline(parseFloat(e.target.value));
+      if (wasPlaying) startPlayback();
+    });
+
+    prevSceneNavBtn.addEventListener('click', () => {
+      const targetIdx = Math.max(0, state.currentSceneIndex - 1);
+      const schedule = buildTimelineSchedule();
+      const targetItem = schedule[targetIdx] || schedule[0];
+      seekTimeline(targetItem.globalStartTime);
+    });
+
+    nextSceneNavBtn.addEventListener('click', () => {
+      const targetIdx = Math.min(state.scenes.length - 1, state.currentSceneIndex + 1);
+      const schedule = buildTimelineSchedule();
+      const targetItem = schedule[targetIdx] || schedule[0];
+      seekTimeline(targetItem.globalStartTime);
+    });
+
+    loopPlaybackCheckbox.addEventListener('change', (e) => {
+      state.loop = e.target.checked;
+    });
+
+    cellGapSlider.addEventListener('input', (e) => {
+      state.cellGap = parseInt(e.target.value, 10);
+      cellGapVal.textContent = `${state.cellGap}px`;
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+    });
+
+    addSceneBtn.addEventListener('click', () => {
+      const prevScene = state.scenes[state.scenes.length - 1];
+      const nextLayout = prevScene ? (prevScene.layoutId === 'split-2v' ? 'split-3v' : 'split-2v') : 'split-2v';
+      const preset = LAYOUT_PRESETS.find(p => p.id === nextLayout);
+
+      const newScene = {
+        id: 'scene-' + Date.now(),
+        layoutId: nextLayout,
+        duration: 4.0,
+        transition: 'cell-push',
+        transitionDuration: 0.7,
+        transitionEasing: DEFAULT_EASING,
+        cells: preset.cells.map((_, i) => createDefaultCellConfig(state.assets[i % (state.assets.length || 1)]?.id))
+      };
+
+      state.scenes.push(newScene);
+      state.currentSceneIndex = state.scenes.length - 1;
+      refreshTimelineRange();
+      renderScenesTabs();
+      updateSceneInspectorUI();
+
+      const schedule = buildTimelineSchedule();
+      const lastItem = schedule[schedule.length - 1];
+      seekTimeline(lastItem.globalStartTime);
+      dbSaveProjectState();
+      showToast('새 씬이 추가되었습니다 (기본: 중심 줌아웃 & Smoothstep).');
+    });
+
+    duplicateSceneBtn.addEventListener('click', () => {
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (!curScene) return;
+
+      const cloned = JSON.parse(JSON.stringify(curScene));
+      cloned.id = 'scene-' + Date.now();
+      state.scenes.splice(state.currentSceneIndex + 1, 0, cloned);
+      state.currentSceneIndex += 1;
+
+      refreshTimelineRange();
+      renderScenesTabs();
+      updateSceneInspectorUI();
+      dbSaveProjectState();
+      showToast('현재 씬이 복제되었습니다.');
+    });
+
+    sceneDurationInput.addEventListener('change', (e) => {
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (curScene) {
+        curScene.duration = Math.max(1, parseFloat(e.target.value) || 4);
+        refreshTimelineRange();
+        renderScenesTabs();
+        renderMainCanvas(state.currentTime);
+        dbSaveProjectState();
+      }
+    });
+
+    sceneTransitionSelect.addEventListener('change', (e) => {
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (curScene) {
+        curScene.transition = e.target.value;
+        dbSaveProjectState();
+      }
+    });
+
+    transDurationSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      transDurVal.textContent = `${val.toFixed(1)}s`;
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (curScene) {
+        curScene.transitionDuration = val;
+        dbSaveProjectState();
+      }
+    });
+
+    transEasingSelect.addEventListener('change', (e) => {
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (curScene) {
+        curScene.transitionEasing = e.target.value;
+        dbSaveProjectState();
+      }
+    });
+
+    autoAssignImagesBtn.addEventListener('click', () => {
+      const curScene = state.scenes[state.currentSceneIndex];
+      if (!curScene || state.assets.length === 0) return;
+
+      curScene.cells.forEach((cell, idx) => {
+        cell.assetId = state.assets[idx % state.assets.length].id;
+      });
+
+      updateSceneInspectorUI();
+      renderMainCanvas(state.currentTime);
+      dbSaveProjectState();
+      showToast('사진이 슬롯에 순차적으로 자동 배치되었습니다.');
+    });
+
+    resetStorageBtn.addEventListener('click', async () => {
+      if (!confirm('현재 프로젝트와 보관함의 모든 사진을 초기화하시겠습니까?')) return;
+      pausePlayback();
+      await dbClearAll();
+      state.assets = [];
+      state.scenes = [];
+      state.currentSceneIndex = 0;
+      state.currentTime = 0;
+      if (state.audio.element) {
+        state.audio.element.pause();
+        state.audio.element.src = '';
+      }
+      state.audio.dataUrl = null;
+      state.audio.name = null;
+      state.audio.audioBuffer = null;
+      await initApp();
+      showToast('모든 저장 데이터가 초기화되었습니다.');
+    });
+
+    exportProjectBtn.addEventListener('click', exportProjectToFile);
+
+    importProjectInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        importProjectFromFile(file);
+      }
+      e.target.value = '';
+    });
+
+    exportVideoBtn.addEventListener('click', startVideoExport);
+    cancelExportBtn.addEventListener('click', cancelExport);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initApp();
+    });
+  </script>
+</body>
+</html>
