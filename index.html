@@ -1027,11 +1027,10 @@
         const sc = state.scenes[i];
         const transDur = exitTransitions[i];
 
+        // Scene 0 always starts clean without entry transition so the video begins purely on the first scene
         let entryTransDur = 0;
         if (i > 0) {
           entryTransDur = exitTransitions[i - 1];
-        } else if (state.seamlessLoopMode && count > 1) {
-          entryTransDur = exitTransitions[count - 1];
         }
 
         const soloDuration = Math.max(0.05, sc.duration - entryTransDur - transDur);
@@ -2320,13 +2319,8 @@
       const totalFrames = Math.ceil(totalDur * exportFps);
       const stepDt = 1 / exportFps;
 
-      let phaseOffset = 0;
+      const phaseOffset = 0;
       if (state.seamlessLoopMode && state.scenes.length > 1) {
-        const schedule = buildTimelineSchedule();
-        const lastItem = schedule[schedule.length - 1];
-        if (lastItem.transDuration > 0) {
-          phaseOffset = lastItem.transStartTime + (lastItem.transDuration / 2);
-        }
         exportLoopIndicator.classList.remove('hidden');
       } else {
         exportLoopIndicator.classList.add('hidden');
@@ -2517,13 +2511,11 @@
       const totalFrames = Math.ceil(totalDur * exportFps);
       let frameIndex = 0;
 
-      let phaseOffset = 0;
+      const phaseOffset = 0;
       if (state.seamlessLoopMode && state.scenes.length > 1) {
-        const schedule = buildTimelineSchedule();
-        const lastItem = schedule[schedule.length - 1];
-        if (lastItem.transDuration > 0) {
-          phaseOffset = lastItem.transStartTime + (lastItem.transDuration / 2);
-        }
+        exportLoopIndicator.classList.remove('hidden');
+      } else {
+        exportLoopIndicator.classList.add('hidden');
       }
 
       const canvasStream = mainCanvas.captureStream(exportFps);
