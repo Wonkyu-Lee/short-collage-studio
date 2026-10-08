@@ -107,15 +107,15 @@
     <aside class="w-80 border-r border-slate-800/80 bg-slate-900/50 flex flex-col shrink-0">
       <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <i class="fa-regular fa-images text-indigo-400 text-sm"></i>
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-300">사진 보관함</span>
+          <i class="fa-solid fa-photo-film text-indigo-400 text-sm"></i>
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-300">미디어 보관함</span>
           <span id="assetCountBadge" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-indigo-300 border border-slate-700 font-mono">0</span>
         </div>
         
         <button id="triggerUploadBtn" type="button" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-xs font-medium transition flex items-center gap-1 shadow-sm active:scale-95">
-          <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i> 사진 올리기
+          <i class="fa-solid fa-arrow-up-from-bracket text-[10px]"></i> 미디어 올리기
         </button>
-        <input type="file" id="multiImageInput" multiple accept="image/*, .heic, .heif, .HEIC, .HEIF" class="hidden">
+        <input type="file" id="multiImageInput" multiple accept="image/*, video/*, .heic, .heif, .HEIC, .HEIF, .mp4, .webm, .mov, .m4v, .mkv, .avi" class="hidden">
       </div>
 
       <!-- Drag & Drop Zone -->
@@ -123,14 +123,14 @@
         <div class="w-10 h-10 rounded-full bg-indigo-500/10 group-hover:bg-indigo-500/20 text-indigo-400 flex items-center justify-center mb-1.5 transition">
           <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
         </div>
-        <p class="text-[11px] text-slate-300 font-medium">사진들을 드래그하거나 클릭하여 추가</p>
-        <p class="text-[9px] text-emerald-400 font-semibold mt-0.5">JPG, PNG, WebP & 아이폰 HEIC 자동 변환</p>
+        <p class="text-[11px] text-slate-300 font-medium">사진 & 동영상을 드래그하거나 클릭하여 추가</p>
+        <p class="text-[9px] text-emerald-400 font-semibold mt-0.5">JPG, PNG, HEIC & MP4, WebM, MOV 지원</p>
         <p class="text-[9px] text-slate-500 mt-0.5">새로고침 시 IndexedDB 100% 영구 보존</p>
       </div>
 
       <!-- Gallery List -->
       <div class="px-3 pb-1 flex items-center justify-between text-[11px] text-slate-400">
-        <span>등록된 사진 리스트</span>
+        <span>등록된 사진/동영상 리스트</span>
         <button id="quickDistributeBtn" class="text-indigo-400 hover:text-indigo-300 text-[10px] font-semibold flex items-center gap-1 hover:underline">
           <i class="fa-solid fa-shuffle text-[9px]"></i> 전체 씬 균등 분배
         </button>
@@ -640,6 +640,75 @@
       });
     }
 
+    function isVideoFile(file) {
+      if (!file) return false;
+      const type = (file.type || '').toLowerCase();
+      const name = (file.name || '').toLowerCase();
+      return type.startsWith('video/') ||
+        name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.mov') ||
+        name.endsWith('.m4v') || name.endsWith('.mkv') || name.endsWith('.avi');
+    }
+
+    function loadVideoElement(dataUrl) {
+      return new Promise((resolve) => {
+        const video = document.createElement('video');
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.autoplay = false;
+        video.crossOrigin = 'anonymous';
+
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+
+          let posterDataUrl = '';
+          try {
+            const c = document.createElement('canvas');
+            c.width = video.videoWidth || 640;
+            c.height = video.videoHeight || 360;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(video, 0, 0, c.width, c.height);
+            posterDataUrl = c.toDataURL('image/jpeg', 0.85);
+          } catch (e) {}
+
+          resolve({
+            videoElement: video,
+            width: video.videoWidth || 1280,
+            height: video.videoHeight || 720,
+            duration: video.duration || 5,
+            posterUrl: posterDataUrl
+          });
+        };
+
+        const timer = setTimeout(done, 4000);
+
+        video.onloadeddata = done;
+        video.oncanplay = done;
+        video.onloadedmetadata = () => {
+          if (video.duration && !settled) {
+            setTimeout(done, 150);
+          }
+        };
+        video.onerror = done;
+
+        video.src = dataUrl;
+        video.load();
+      });
+    }
+
+    function syncVideoAssetsTime(simTime) {
+      if (!state.assets) return;
+      for (let i = 0; i < state.assets.length; i++) {
+        const a = state.assets[i];
+        if (a.mediaType === 'video' && a.videoElement && a.duration > 0) {
+          a.videoElement.currentTime = (simTime % a.duration);
+        }
+      }
+    }
+
     async function dbSaveAsset(asset) {
       try {
         const db = await openDB();
@@ -647,9 +716,12 @@
         tx.objectStore('assets').put({
           id: asset.id,
           name: asset.name,
+          mediaType: asset.mediaType || 'image',
           dataUrl: asset.dataUrl,
+          posterUrl: asset.posterUrl || null,
           width: asset.width || 0,
-          height: asset.height || 0
+          height: asset.height || 0,
+          duration: asset.duration || 0
         });
         return new Promise(res => { tx.oncomplete = () => res(true); });
       } catch (e) {
@@ -815,33 +887,58 @@
 
       for (let i = 0; i < totalFiles; i++) {
         const file = files[i];
-        const displayName = file.name || `photo_${Date.now()}_${i}.jpg`;
+        const displayName = file.name || `media_${Date.now()}_${i}`;
         heicCurrentFileName.textContent = `${displayName} 처리 중...`;
 
         try {
-          let dataUrl = '';
-          if (isHeicFile(file)) {
-            const jpegBlob = await convertHeicToJpegBlob(file);
-            dataUrl = await readFileAsDataURL(jpegBlob);
+          if (isVideoFile(file)) {
+            const dataUrl = await readFileAsDataURL(file);
+            const vidRes = await loadVideoElement(dataUrl);
+
+            const assetObj = {
+              id: 'asset_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+              name: displayName,
+              mediaType: 'video',
+              dataUrl: dataUrl,
+              posterUrl: vidRes.posterUrl,
+              width: vidRes.width,
+              height: vidRes.height,
+              duration: vidRes.duration,
+              videoElement: vidRes.videoElement
+            };
+
+            state.assets.push(assetObj);
+            await dbSaveAsset(assetObj);
+            successCount++;
+
+            autoFillAssetIntoScenes(assetObj.id);
+
           } else {
-            dataUrl = await readFileAsDataURL(file);
+            let dataUrl = '';
+            if (isHeicFile(file)) {
+              const jpegBlob = await convertHeicToJpegBlob(file);
+              dataUrl = await readFileAsDataURL(jpegBlob);
+            } else {
+              dataUrl = await readFileAsDataURL(file);
+            }
+
+            const imgElem = await loadImageElement(dataUrl);
+            const assetObj = {
+              id: 'asset_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+              name: displayName,
+              mediaType: 'image',
+              dataUrl: dataUrl,
+              width: imgElem.width,
+              height: imgElem.height,
+              imgElement: imgElem
+            };
+
+            state.assets.push(assetObj);
+            await dbSaveAsset(assetObj);
+            successCount++;
+
+            autoFillAssetIntoScenes(assetObj.id);
           }
-
-          const imgElem = await loadImageElement(dataUrl);
-          const assetObj = {
-            id: 'asset_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-            name: displayName,
-            dataUrl: dataUrl,
-            width: imgElem.width,
-            height: imgElem.height,
-            imgElement: imgElem
-          };
-
-          state.assets.push(assetObj);
-          await dbSaveAsset(assetObj);
-          successCount++;
-
-          autoFillAssetIntoScenes(assetObj.id);
 
         } catch (err) {
           console.error(`File processing error [${displayName}]:`, err);
@@ -864,7 +961,7 @@
       dbSaveProjectState();
 
       if (successCount > 0) {
-        showToast(`${successCount}장의 사진이 보관함에 등록되었습니다.`);
+        showToast(`${successCount}개의 미디어(사진/동영상)가 보관함에 등록되었습니다.`);
       }
     }
 
@@ -1076,7 +1173,7 @@
 
       const asset = state.assets.find(a => a.id === config.assetId) || state.assets[0];
 
-      if (!asset || !asset.imgElement) {
+      if (!asset || (!asset.imgElement && !asset.videoElement)) {
         const grad = tCtx.createLinearGradient(x, y, x + w, y + h);
         grad.addColorStop(0, '#111827');
         grad.addColorStop(1, '#0b0f19');
@@ -1087,12 +1184,16 @@
         tCtx.font = '600 24px Pretendard, sans-serif';
         tCtx.textAlign = 'center';
         tCtx.textBaseline = 'middle';
-        tCtx.fillText('사진을 추가해주세요', x + w / 2, y + h / 2);
+        tCtx.fillText('사진/동영상을 추가해주세요', x + w / 2, y + h / 2);
         tCtx.restore();
         return;
       }
 
-      const img = asset.imgElement;
+      const isVid = asset.mediaType === 'video' && asset.videoElement;
+      const media = isVid ? asset.videoElement : asset.imgElement;
+      const mediaW = isVid ? (asset.videoElement.videoWidth || asset.width || 1280) : asset.imgElement.width;
+      const mediaH = isVid ? (asset.videoElement.videoHeight || asset.height || 720) : asset.imgElement.height;
+
       const easeFn = EASING_FUNCTIONS[config.easing] || EASING_FUNCTIONS.smoothstep;
       const easedT = easeFn(Math.min(Math.max(0, rawProg), 1));
       
@@ -1101,9 +1202,9 @@
       const effectiveP = startP + (endP - startP) * easedT;
 
       const zoom = config.zoomFactor !== undefined ? config.zoomFactor : DEFAULT_ZOOM_FACTOR;
-      const baseScale = Math.max(w / img.width, h / img.height);
-      const curW = img.width * baseScale;
-      const curH = img.height * baseScale;
+      const baseScale = Math.max(w / mediaW, h / mediaH);
+      const curW = mediaW * baseScale;
+      const curH = mediaH * baseScale;
 
       const maxDx = Math.max(0, curW - w);
       const maxDy = Math.max(0, curH - h);
@@ -1114,53 +1215,51 @@
 
       switch (config.motion) {
         case 'zoom-out': {
-          // Center-anchored zoom out from initial zoom (1.3x) down towards 1.0x
           const zScale = zoom - ((zoom - 1.0) * effectiveP);
           tCtx.save();
           tCtx.translate(cellCenterX, cellCenterY);
           tCtx.scale(zScale, zScale);
-          tCtx.drawImage(img, -curW / 2, -curH / 2, curW, curH);
+          tCtx.drawImage(media, -curW / 2, -curH / 2, curW, curH);
           tCtx.restore();
           break;
         }
         case 'zoom-in': {
-          // Center-anchored zoom in from 1.0x up towards zoom
           const zScale = 1.0 + ((zoom - 1.0) * effectiveP);
           tCtx.save();
           tCtx.translate(cellCenterX, cellCenterY);
           tCtx.scale(zScale, zScale);
-          tCtx.drawImage(img, -curW / 2, -curH / 2, curW, curH);
+          tCtx.drawImage(media, -curW / 2, -curH / 2, curW, curH);
           tCtx.restore();
           break;
         }
         case 'slide-lr': {
           const currentShiftX = -maxDx + (maxDx * effectiveP);
-          tCtx.drawImage(img, x + currentShiftX, y - maxDy / 2, curW, curH);
+          tCtx.drawImage(media, x + currentShiftX, y - maxDy / 2, curW, curH);
           break;
         }
         case 'slide-rl': {
           const currentShiftX = -(maxDx * effectiveP);
-          tCtx.drawImage(img, x + currentShiftX, y - maxDy / 2, curW, curH);
+          tCtx.drawImage(media, x + currentShiftX, y - maxDy / 2, curW, curH);
           break;
         }
         case 'slide-tb': {
           const currentShiftY = -maxDy + (maxDy * effectiveP);
-          tCtx.drawImage(img, x - maxDx / 2, y + currentShiftY, curW, curH);
+          tCtx.drawImage(media, x - maxDx / 2, y + currentShiftY, curW, curH);
           break;
         }
         case 'slide-bt': {
           const currentShiftY = -(maxDy * effectiveP);
-          tCtx.drawImage(img, x - maxDx / 2, y + currentShiftY, curW, curH);
+          tCtx.drawImage(media, x - maxDx / 2, y + currentShiftY, curW, curH);
           break;
         }
         case 'diagonal': {
           const currentShiftX = -maxDx + (maxDx * effectiveP);
           const currentShiftY = -maxDy + (maxDy * effectiveP);
-          tCtx.drawImage(img, x + currentShiftX, y + currentShiftY, curW, curH);
+          tCtx.drawImage(media, x + currentShiftX, y + currentShiftY, curW, curH);
           break;
         }
         default: {
-          tCtx.drawImage(img, x - maxDx / 2, y - maxDy / 2, curW, curH);
+          tCtx.drawImage(media, x - maxDx / 2, y - maxDy / 2, curW, curH);
         }
       }
 
@@ -1184,6 +1283,8 @@
         mainCtx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         return;
       }
+
+      syncVideoAssetsTime(t);
 
       const tState = getTimelineStateAtTime(t);
       if (!tState) return;
@@ -1361,6 +1462,12 @@
         state.audio.element.play().catch(() => {});
       }
 
+      for (const a of state.assets) {
+        if (a.mediaType === 'video' && a.videoElement && a.videoElement.paused) {
+          a.videoElement.play().catch(() => {});
+        }
+      }
+
       state.animationFrameId = requestAnimationFrame(playbackTick);
     }
 
@@ -1372,6 +1479,11 @@
       }
       if (state.audio.element) {
         state.audio.element.pause();
+      }
+      for (const a of state.assets) {
+        if (a.mediaType === 'video' && a.videoElement && !a.videoElement.paused) {
+          a.videoElement.pause();
+        }
       }
     }
 
@@ -1408,6 +1520,7 @@
       if (state.audio.element && state.audio.element.src) {
         state.audio.element.currentTime = state.currentTime;
       }
+      syncVideoAssetsTime(state.currentTime);
       renderMainCanvas(state.currentTime);
       syncTimelineUI();
     }
@@ -1516,23 +1629,32 @@
       if (state.assets.length === 0) {
         galleryContainer.innerHTML = `
           <div class="h-36 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-xl text-center p-3 text-slate-500">
-            <i class="fa-regular fa-image text-2xl mb-1 text-slate-600"></i>
-            <span class="text-xs">사진 보관함이 비어있습니다.</span>
+            <i class="fa-solid fa-photo-film text-2xl mb-1 text-slate-600"></i>
+            <span class="text-xs">미디어 보관함이 비어있습니다.</span>
           </div>
         `;
         return;
       }
 
       state.assets.forEach((asset, idx) => {
+        const isVid = asset.mediaType === 'video';
+        const thumbSrc = isVid ? (asset.posterUrl || asset.dataUrl) : asset.dataUrl;
+
         const card = document.createElement('div');
         card.className = 'group flex items-center gap-2.5 p-2 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-indigo-500/50 transition';
         card.innerHTML = `
-          <div class="w-11 h-11 rounded-lg bg-black overflow-hidden shrink-0 border border-slate-700">
-            <img src="${asset.dataUrl}" class="w-full h-full object-cover">
+          <div class="w-11 h-11 rounded-lg bg-black overflow-hidden shrink-0 border border-slate-700 relative">
+            <img src="${thumbSrc}" class="w-full h-full object-cover">
+            ${isVid ? `<div class="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-[10px]"><i class="fa-solid fa-play text-[10px]"></i></div>` : ''}
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-xs font-medium text-slate-200 truncate" title="${asset.name}">${asset.name}</p>
-            <span class="text-[9px] text-slate-400 font-mono">#${idx + 1}</span>
+            <div class="flex items-center gap-1 mt-0.5">
+              ${isVid 
+                ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30 flex items-center gap-1"><i class="fa-solid fa-video text-[8px]"></i> 비디오 ${asset.duration ? asset.duration.toFixed(1) + 's' : ''}</span>`
+                : `<span class="text-[9px] text-slate-400 font-mono">#${idx + 1} 사진</span>`
+              }
+            </div>
           </div>
           <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
             <button class="p-1 text-slate-400 hover:text-rose-400 rounded delete-asset-btn" title="삭제">
@@ -1549,7 +1671,7 @@
           updateSceneInspectorUI();
           renderMainCanvas(state.currentTime);
           dbSaveProjectState();
-          showToast('사진이 보관함에서 삭제되었습니다.');
+          showToast('미디어가 보관함에서 삭제되었습니다.');
         });
 
         galleryContainer.appendChild(card);
@@ -1981,9 +2103,12 @@
           assets: state.assets.map(a => ({
             id: a.id,
             name: a.name,
+            mediaType: a.mediaType || 'image',
             dataUrl: a.dataUrl,
+            posterUrl: a.posterUrl || null,
             width: a.width,
-            height: a.height
+            height: a.height,
+            duration: a.duration || 0
           })),
           scenes: state.scenes,
           cellGap: state.cellGap,
@@ -2029,17 +2154,35 @@
 
             state.assets = [];
             for (const assetData of data.assets) {
-              const imgElem = await loadImageElement(assetData.dataUrl);
-              const assetObj = {
-                id: assetData.id,
-                name: assetData.name,
-                dataUrl: assetData.dataUrl,
-                width: assetData.width || imgElem.width,
-                height: assetData.height || imgElem.height,
-                imgElement: imgElem
-              };
-              state.assets.push(assetObj);
-              await dbSaveAsset(assetObj);
+              if (assetData.mediaType === 'video') {
+                const vidRes = await loadVideoElement(assetData.dataUrl);
+                const assetObj = {
+                  id: assetData.id,
+                  name: assetData.name,
+                  mediaType: 'video',
+                  dataUrl: assetData.dataUrl,
+                  posterUrl: assetData.posterUrl || vidRes.posterUrl,
+                  width: assetData.width || vidRes.width,
+                  height: assetData.height || vidRes.height,
+                  duration: assetData.duration || vidRes.duration,
+                  videoElement: vidRes.videoElement
+                };
+                state.assets.push(assetObj);
+                await dbSaveAsset(assetObj);
+              } else {
+                const imgElem = await loadImageElement(assetData.dataUrl);
+                const assetObj = {
+                  id: assetData.id,
+                  name: assetData.name,
+                  mediaType: 'image',
+                  dataUrl: assetData.dataUrl,
+                  width: assetData.width || imgElem.width,
+                  height: assetData.height || imgElem.height,
+                  imgElement: imgElem
+                };
+                state.assets.push(assetObj);
+                await dbSaveAsset(assetObj);
+              }
             }
 
             state.scenes = data.scenes;
@@ -2503,38 +2646,82 @@
       if (storedAssets && storedAssets.length > 0) {
         for (const item of storedAssets) {
           try {
-            const imgElem = await loadImageElement(item.dataUrl);
-            state.assets.push({
-              id: item.id,
-              name: item.name,
-              dataUrl: item.dataUrl,
-              width: item.width || imgElem.width,
-              height: item.height || imgElem.height,
-              imgElement: imgElem
-            });
+            if (item.mediaType === 'video') {
+              const vidRes = await loadVideoElement(item.dataUrl);
+              state.assets.push({
+                id: item.id,
+                name: item.name,
+                mediaType: 'video',
+                dataUrl: item.dataUrl,
+                posterUrl: item.posterUrl || vidRes.posterUrl,
+                width: item.width || vidRes.width,
+                height: item.height || vidRes.height,
+                duration: item.duration || vidRes.duration,
+                videoElement: vidRes.videoElement
+              });
+            } else {
+              const imgElem = await loadImageElement(item.dataUrl);
+              state.assets.push({
+                id: item.id,
+                name: item.name,
+                mediaType: 'image',
+                dataUrl: item.dataUrl,
+                width: item.width || imgElem.width,
+                height: item.height || imgElem.height,
+                imgElement: imgElem
+              });
+            }
           } catch (e) {
             console.warn('Failed to load cached asset:', item.name);
           }
         }
       } else {
-        const defaultSamples = [
-          { id: 'sample-1', name: '자연 풍경 (Alpine)', src: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1600&q=80' },
-          { id: 'sample-2', name: '도시 야경 (Tokyo)', src: 'https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1600&q=80' },
-          { id: 'sample-3', name: '에메랄드 해변', src: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80' },
-          { id: 'sample-4', name: '설산 일출 파노라마', src: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1600&q=80' }
+        function createGradientSample(title, color1, color2, width = 1080, height = 1920) {
+          const c = document.createElement('canvas');
+          c.width = width;
+          c.height = height;
+          const ctx = c.getContext('2d');
+
+          const grad = ctx.createLinearGradient(0, 0, width, height);
+          grad.addColorStop(0, color1);
+          grad.addColorStop(1, color2);
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.beginPath();
+          ctx.arc(width * 0.5, height * 0.35, width * 0.35, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 52px Pretendard, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(title, width / 2, height / 2 - 20);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+          ctx.font = '500 28px Pretendard, sans-serif';
+          ctx.fillText('Shorts Collage Studio (1080×1920)', width / 2, height / 2 + 40);
+
+          return c.toDataURL('image/jpeg', 0.9);
+        }
+
+        const sampleConfigs = [
+          { id: 'sample-1', name: '자연 풍경 (Alpine)', c1: '#3b82f6', c2: '#06b6d4' },
+          { id: 'sample-2', name: '도시 야경 (Tokyo)', c1: '#6366f1', c2: '#ec4899' },
+          { id: 'sample-3', name: '에메랄드 해변', c1: '#059669', c2: '#10b981' },
+          { id: 'sample-4', name: '설산 일출 파노라마', c1: '#f59e0b', c2: '#ef4444' }
         ];
 
-        for (const s of defaultSamples) {
+        for (const s of sampleConfigs) {
           try {
-            const resp = await fetch(s.src);
-            const blob = await resp.blob();
-            const dataUrl = await readFileAsDataURL(blob);
+            const dataUrl = createGradientSample(s.name, s.c1, s.c2);
             const imgElem = await loadImageElement(dataUrl);
-            const aObj = { id: s.id, name: s.name, dataUrl, width: imgElem.width, height: imgElem.height, imgElement: imgElem };
+            const aObj = { id: s.id, name: s.name, mediaType: 'image', dataUrl, width: 1080, height: 1920, imgElement: imgElem };
             state.assets.push(aObj);
             await dbSaveAsset(aObj);
           } catch (e) {
-            console.warn('Sample load fallback warning:', e);
+            console.warn('Sample generate fallback warning:', e);
           }
         }
       }
